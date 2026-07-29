@@ -1,0 +1,36 @@
+name: Generate migration preview
+
+on:
+  pull_request:
+    paths:
+      - 'packages/database/**'
+      - '.github/workflows/generate-migration-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+
+      - run: pnpm install --frozen-lockfile=false
+      - run: rm -rf packages/database/drizzle
+      - run: pnpm --filter @forecast/database exec drizzle-kit generate --name initial_platform
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-drizzle-migration
+          path: packages/database/drizzle
+          if-no-files-found: error
+          retention-days: 3
