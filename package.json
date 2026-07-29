@@ -1,0 +1,30 @@
+{
+  "name": "event-forecast-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Extensible entertainment prediction and forecasting platform.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "doctor": "node scripts/doctor.mjs",
+    "health": "node scripts/health.mjs",
+    "verify": "node scripts/verify.mjs",
+    "support-bundle": "node scripts/support-bundle.mjs",
+    "db:generate": "pnpm --filter @forecast/database db:generate",
+    "db:migrate": "pnpm --filter @forecast/database db:migrate"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.4",
+    "typescript": "^5.9.3"
+  }
+}
