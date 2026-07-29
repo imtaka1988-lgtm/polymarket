@@ -171,16 +171,22 @@ integrationTest('uses the public feed index for large keyset pagination', async 
 
   const plan = await database.query<{ 'QUERY PLAN': unknown }>(
     `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-     SELECT id, updated_at
-     FROM markets
-     WHERE status = ANY($1::market_status[])
+     SELECT candidate.*
+     FROM unnest($1::market_status[]) AS requested(status)
+     CROSS JOIN LATERAL (
+       SELECT id, updated_at
+       FROM markets
+       WHERE status = requested.status
+       ORDER BY updated_at DESC NULLS LAST, id DESC NULLS LAST
+       LIMIT $2
+     ) AS candidate
      ORDER BY updated_at DESC NULLS LAST, id DESC NULLS LAST
      LIMIT $2`,
-    [['open'], 101],
+    [['open', 'closed'], 101],
   );
   assert.match(JSON.stringify(plan.rows[0]?.['QUERY PLAN']), /markets_public_feed_idx/);
 
-  const firstResponse = await fetch(`${baseUrl}/api/v1/markets?status=open&limit=100`);
+  const firstResponse = await fetch(`${baseUrl}/api/v1/markets?status=all&limit=100`);
   const first = await readJson<MarketListResponse>(firstResponse);
   assert.equal(firstResponse.status, 200);
   assert.equal(first.data.length, 100);
@@ -188,7 +194,7 @@ integrationTest('uses the public feed index for large keyset pagination', async 
   assert.notEqual(first.pagination.nextCursor, null);
 
   const secondResponse = await fetch(
-    `${baseUrl}/api/v1/markets?status=open&limit=100&cursor=${encodeURIComponent(
+    `${baseUrl}/api/v1/markets?status=all&limit=100&cursor=${encodeURIComponent(
       first.pagination.nextCursor ?? '',
     )}`,
   );

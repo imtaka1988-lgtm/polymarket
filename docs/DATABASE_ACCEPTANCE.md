@@ -125,7 +125,8 @@ apps/api/src/read-api.integration.test.ts
 - 公开状态、详情、价格、错误和数据状态 HTTP 契约；
 - 2 万行市场数据上两页各 100 条的 Keyset 分页不重不漏且顺序稳定；
 - `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` 命中 `markets_public_feed_idx`；
-- `markets.status` 使用原生 `market_status[]` 比较，不以 text cast 绕开索引；
+- `market_status[]` 展开后逐状态执行有界 LATERAL 等值扫描，不以 text cast 或 `ANY(array)`
+  绕开索引排序；
 - 查询排序显式使用 `NULLS LAST`，与 Drizzle 降序索引规格一致；
 - draft 市场和内部告警 message/details 不进入公开响应。
 
@@ -323,7 +324,8 @@ CI 还会绕过 Turbo，分别直接执行 Worker 和 API 的 `test:integration`
 
 - Migration 0000–0003 是否已全部执行；
 - 市场分页是否按 `(updated_at DESC, id DESC)`；
-- `markets_public_feed_idx` 是否存在，状态过滤是否仍使用 `market_status[]`；
+- `markets_public_feed_idx` 是否存在，状态数组是否仍展开为逐状态 LATERAL 等值扫描；
+- 不要改回 `status = ANY(array)`；它不能为复合索引排序提供单一 status 等值保证；
 - 查询是否保留显式 `NULLS LAST`；省略后会与 Drizzle 索引规格不一致并回退为排序；
 - 大数据计划是否出现 `markets_public_feed_idx`；若回退为顺序扫描，先运行 `ANALYZE markets`
   并检查查询和索引定义，不要删除计划断言；

@@ -84,7 +84,8 @@
 - API 升级为 0.2.x，M1.5 版本化只读 API 完成。
 - 数据库测试跨 Workspace 包串行，避免 API 与 Worker 验收清理互相污染。
 - Turbo `test` 显式透传数据库验收环境；CI required integration Step 禁止 PostgreSQL 测试静默 SKIP。
-- 市场状态过滤改用原生 `market_status[]`，避免 enum text cast 阻止复合索引。
+- 市场状态数组改为逐状态有界 LATERAL 等值索引扫描，避免 text cast 和 `ANY(array)`
+  阻止复合索引排序。
 - 市场 Keyset 排序显式使用 `NULLS LAST`，与 Drizzle 降序索引规格一致，防止查询计划回退为
   `Seq Scan + Sort`。
 

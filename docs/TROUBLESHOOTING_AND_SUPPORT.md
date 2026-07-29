@@ -52,7 +52,7 @@ V1 API 错误体必须包含稳定 `error.code` 和与响应头一致的 `x-requ
 
 1. 迁移 `0003_thankful_crusher_hogan.sql` 已执行；
 2. `markets_public_feed_idx` 存在；
-3. 状态查询仍使用 `market_status[]`，没有把 `status` 强转成 text；
+3. 状态数组仍展开为逐状态 LATERAL 等值索引扫描，没有改回 text cast 或 `ANY(array)`；
 4. 排序仍显式使用 `DESC NULLS LAST`，与 Drizzle 索引规格一致；
 5. `ANALYZE markets` 最近执行；
 6. 前端 `limit` 不超过 100，且使用 Cursor 而不是 Offset。

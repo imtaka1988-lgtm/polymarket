@@ -24,29 +24,39 @@ export class MarketReadStore {
     cursor: MarketCursor | null;
   }): Promise<MarketListResult> {
     const result = await this.pool.query<MarketRow>(
-      `WITH page AS (
-         SELECT
-           m.id,
-           m.title,
-           m.kind,
-           m.status::text AS status,
-           m.original_rules,
-           m.rules_summary,
-           m.opens_at,
-           m.closes_at,
-           m.resolved_at,
-           m.schema_version,
-           m.updated_at,
-           pm.provider,
-           pm.provider_market_id
-         FROM markets m
-         LEFT JOIN provider_markets pm ON pm.id = m.provider_market_id
-         WHERE m.status = ANY($1::market_status[])
-           AND (
-             $2::timestamptz IS NULL
-             OR (m.updated_at, m.id) < ($2::timestamptz, $3::uuid)
-           )
-         ORDER BY m.updated_at DESC NULLS LAST, m.id DESC NULLS LAST
+      `WITH status_pages AS (
+         SELECT candidate.*
+         FROM unnest($1::market_status[]) AS requested(status)
+         CROSS JOIN LATERAL (
+           SELECT
+             m.id,
+             m.title,
+             m.kind,
+             m.status::text AS status,
+             m.original_rules,
+             m.rules_summary,
+             m.opens_at,
+             m.closes_at,
+             m.resolved_at,
+             m.schema_version,
+             m.updated_at,
+             pm.provider,
+             pm.provider_market_id
+           FROM markets m
+           LEFT JOIN provider_markets pm ON pm.id = m.provider_market_id
+           WHERE m.status = requested.status
+             AND (
+               $2::timestamptz IS NULL
+               OR (m.updated_at, m.id) < ($2::timestamptz, $3::uuid)
+             )
+           ORDER BY m.updated_at DESC NULLS LAST, m.id DESC NULLS LAST
+           LIMIT $4
+         ) AS candidate
+       ),
+       page AS (
+         SELECT *
+         FROM status_pages
+         ORDER BY updated_at DESC NULLS LAST, id DESC NULLS LAST
          LIMIT $4
        )
        SELECT
