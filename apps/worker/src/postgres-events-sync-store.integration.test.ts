@@ -6,9 +6,10 @@ import type {
   NormalizedPolymarketEvent,
   NormalizedPolymarketMarket,
 } from '@forecast/provider-polymarket';
+import { integrationTestDatabaseUrl } from './integration-test-environment.js';
 import { PostgresEventsKeysetSyncStore } from './postgres-events-sync-store.js';
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = integrationTestDatabaseUrl();
 const integrationTest = databaseUrl === undefined ? test.skip : test;
 let pool: Pool | undefined;
 let store: PostgresEventsKeysetSyncStore | undefined;
@@ -45,15 +46,17 @@ integrationTest('migration creates every table required by the keyset store', as
      WHERE table_schema = 'public'
        AND table_name = ANY($1::text[])
      ORDER BY table_name`,
-    [[
-      'provider_events',
-      'provider_markets',
-      'markets',
-      'market_outcomes',
-      'provider_sync_checkpoints',
-      'provider_sync_runs',
-      'provider_sync_pages',
-    ]],
+    [
+      [
+        'provider_events',
+        'provider_markets',
+        'markets',
+        'market_outcomes',
+        'provider_sync_checkpoints',
+        'provider_sync_runs',
+        'provider_sync_pages',
+      ],
+    ],
   );
 
   assert.deepEqual(
@@ -114,55 +117,61 @@ integrationTest('commits a page atomically and resumes from the stored cursor', 
   assert.deepEqual(run.rows[0], { status: 'partial', next_cursor: 'cursor-page-2' });
 });
 
-integrationTest('replaying the same page is idempotent for raw and normalized records', async () => {
-  const database = requirePool();
-  const syncStore = requireStore();
-  const runId = await syncStore.startRun({
-    querySignature: 'polymarket:events-keyset:v1:test-replay',
-    startedAt: '2026-07-29T12:10:00.000Z',
-  });
-  const commit = buildCommit({
-    runId,
-    querySignature: 'polymarket:events-keyset:v1:test-replay',
-  });
+integrationTest(
+  'replaying the same page is idempotent for raw and normalized records',
+  async () => {
+    const database = requirePool();
+    const syncStore = requireStore();
+    const runId = await syncStore.startRun({
+      querySignature: 'polymarket:events-keyset:v1:test-replay',
+      startedAt: '2026-07-29T12:10:00.000Z',
+    });
+    const commit = buildCommit({
+      runId,
+      querySignature: 'polymarket:events-keyset:v1:test-replay',
+    });
 
-  await syncStore.commitPage(commit);
-  await syncStore.commitPage(commit);
+    await syncStore.commitPage(commit);
+    await syncStore.commitPage(commit);
 
-  assert.deepEqual(await readCoreCounts(database), {
-    pages: 1,
-    providerEvents: 1,
-    providerMarkets: 1,
-    markets: 1,
-    outcomes: 2,
-    checkpoints: 1,
-  });
-});
+    assert.deepEqual(await readCoreCounts(database), {
+      pages: 1,
+      providerEvents: 1,
+      providerMarkets: 1,
+      markets: 1,
+      outcomes: 2,
+      checkpoints: 1,
+    });
+  },
+);
 
-integrationTest('rolls back the page, normalized data, and cursor when persistence fails', async () => {
-  const database = requirePool();
-  const syncStore = requireStore();
-  const runId = await syncStore.startRun({
-    querySignature: 'polymarket:events-keyset:v1:test-rollback',
-    startedAt: '2026-07-29T12:20:00.000Z',
-  });
-  const commit = buildCommit({
-    runId,
-    querySignature: 'polymarket:events-keyset:v1:test-rollback',
-    providerMarketId: 'x'.repeat(300),
-  });
+integrationTest(
+  'rolls back the page, normalized data, and cursor when persistence fails',
+  async () => {
+    const database = requirePool();
+    const syncStore = requireStore();
+    const runId = await syncStore.startRun({
+      querySignature: 'polymarket:events-keyset:v1:test-rollback',
+      startedAt: '2026-07-29T12:20:00.000Z',
+    });
+    const commit = buildCommit({
+      runId,
+      querySignature: 'polymarket:events-keyset:v1:test-rollback',
+      providerMarketId: 'x'.repeat(300),
+    });
 
-  await assert.rejects(() => syncStore.commitPage(commit), /value too long|character varying/i);
+    await assert.rejects(() => syncStore.commitPage(commit), /value too long|character varying/i);
 
-  assert.deepEqual(await readCoreCounts(database), {
-    pages: 0,
-    providerEvents: 0,
-    providerMarkets: 0,
-    markets: 0,
-    outcomes: 0,
-    checkpoints: 0,
-  });
-});
+    assert.deepEqual(await readCoreCounts(database), {
+      pages: 0,
+      providerEvents: 0,
+      providerMarkets: 0,
+      markets: 0,
+      outcomes: 0,
+      checkpoints: 0,
+    });
+  },
+);
 
 function buildCommit(input: {
   runId: string | null;

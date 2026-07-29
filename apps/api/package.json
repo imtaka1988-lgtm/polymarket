@@ -8,7 +8,8 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test": "node --import tsx --test --test-concurrency=1 src/**/*.test.ts"
+    "test": "node --import tsx --test --test-concurrency=1 src/**/*.test.ts",
+    "test:integration": "node --import tsx --test --test-concurrency=1 src/*.integration.test.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.1.24",

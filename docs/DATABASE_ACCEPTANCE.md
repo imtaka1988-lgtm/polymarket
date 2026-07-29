@@ -1,6 +1,6 @@
 # 数据库迁移与自动验收规范
 
-> 文档版本：V1.3
+> 文档版本：V1.4
 > 最后更新：2026-07-29  
 > 适用阶段：M1.2 及以后所有数据库改动  
 > 状态：已由 GitHub Actions 验证
@@ -215,6 +215,10 @@ pnpm verify
 API 与 Worker 的 PostgreSQL 测试会修改同一组验收表，因此 `pnpm test` 和 `pnpm verify` 的测试阶段
 跨包串行执行。不得为了加速而恢复并行，除非每个包已迁移到完全隔离的测试数据库或 Schema。
 
+Turborepo `test` 任务必须显式透传 `TEST_DATABASE_URL` 和 `REQUIRE_TEST_DATABASE`。CI 将
+`REQUIRE_TEST_DATABASE=true`，测试若拿不到数据库 URL 必须直接失败，禁止以 SKIP 获得绿色。
+CI 还会绕过 Turbo，分别直接执行 Worker 和 API 的 `test:integration`，作为第二层防回归验收。
+
 ## 9. 数据库变更流程
 
 ```text
@@ -309,6 +313,7 @@ API 与 Worker 的 PostgreSQL 测试会修改同一组验收表，因此 `pnpm t
 - draft/pending_review 是否被公开状态白名单排除；
 - PostgreSQL `numeric` 是否仍以字符串返回；
 - API 和 Worker 数据库测试是否跨包串行；
+- Turbo 是否透传 `TEST_DATABASE_URL`，CI 是否执行 required direct integration Step；
 - Provider 告警 message/details 是否误入公开 DTO。
 
 ## 11. 外部求助资料
@@ -340,6 +345,7 @@ PR #4、PR #5、PR #7 与 PR #8 的 PostgreSQL CI 已验证：
 - 失败页不污染 Checkpoint 累计计数；
 - 多实例 Advisory Lock 互斥、释放和连接池隔离；
 - Store Pool 大小为 1 时完整同步不自阻塞；
+- CI required integration Step 禁止数据库测试被静默跳过；
 - `pnpm-lock.yaml` 冻结依赖安装；
 - 自动测试通过；
 - TypeScript 类型检查通过；

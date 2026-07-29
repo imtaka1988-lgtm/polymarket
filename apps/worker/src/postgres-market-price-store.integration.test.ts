@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test, { after, before, beforeEach } from 'node:test';
 import { Pool } from 'pg';
+import { integrationTestDatabaseUrl } from './integration-test-environment.js';
 import { PostgresMarketPriceStore, type MarketPriceUpdate } from './postgres-market-price-store.js';
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = integrationTestDatabaseUrl();
 const integrationTest = databaseUrl === undefined ? test.skip : test;
 let pool: Pool | undefined;
 let store: PostgresMarketPriceStore | undefined;

@@ -226,6 +226,7 @@ Worker 定时触发
 - V1 市场列表、详情、current price 与平台数据状态；
 - 稳定 Keyset Cursor、十进制价格、Request ID 和错误代码；
 - API 公开状态白名单、内部告警字段隔离和 PostgreSQL HTTP 集成测试；
+- required database test fail-closed、Turbo 环境透传和 direct integration CI Step；
 - `docs/API_READ_CONTRACT.md` 和 ADR-0007；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md` 和完整外援文档。
