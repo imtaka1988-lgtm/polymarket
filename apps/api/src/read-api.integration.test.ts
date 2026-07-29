@@ -5,7 +5,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Pool } from 'pg';
 import { createApiApplication } from './application';
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = integrationTestDatabaseUrl();
 const integrationTest = databaseUrl === undefined ? test.skip : test;
 let pool: Pool | undefined;
 let app: INestApplication | undefined;
@@ -311,4 +311,12 @@ interface DataStatusResponse {
     components: unknown[];
     openAlerts: Array<{ code: string }>;
   };
+}
+
+function integrationTestDatabaseUrl(): string | undefined {
+  const value = process.env.TEST_DATABASE_URL;
+  if (process.env.REQUIRE_TEST_DATABASE === 'true' && value === undefined) {
+    throw new Error('TEST_DATABASE_URL is required when REQUIRE_TEST_DATABASE=true');
+  }
+  return value;
 }

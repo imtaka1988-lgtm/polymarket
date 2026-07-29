@@ -151,5 +151,7 @@ V1 当前稳定错误代码：
 - healthy/degraded/readOnly 转换；
 - 内部告警 message/details 不出现在公开响应；
 - API、Worker PostgreSQL 测试跨包串行，避免测试清理互相污染。
+- CI 以 `REQUIRE_TEST_DATABASE=true` 强制数据库 URL 存在，并绕过 Turbo 再直接执行集成测试；
+  任何 SKIP 都不能作为 PostgreSQL 验收证据。
 
 完整 PostgreSQL HTTP 验收在 GitHub Actions 的 PostgreSQL 16 服务中执行。

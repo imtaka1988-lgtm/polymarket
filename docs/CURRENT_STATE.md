@@ -17,6 +17,7 @@
 - PR #7：M1.3b CLOB REST/WebSocket 价格闭环、耐久 current read model 和实时 Leader Lock（本状态随 PR #7 合并生效）。
 - PR #8：M1.4 生命周期回查、degraded 状态、耐久告警和人工复核候选（本状态随 PR #8 合并生效）。
 - PR #9：M1.5 版本化只读市场、价格、平台状态和稳定错误契约（本状态随 PR #9 合并生效）。
+- PR #10：数据库测试环境 fail-closed 和 CI direct integration 防伪绿验收（本状态随 PR #10 合并生效）。
 
 ## 2. 当前已经具备
 
@@ -84,6 +85,7 @@
 - V1 稳定 DTO、十进制字符串、Request ID 和错误代码；
 - API 只读 PostgreSQL，不在请求链路调用 Provider，不泄漏原始 payload 或内部告警详情；
 - API PostgreSQL HTTP 集成测试和跨包数据库测试串行隔离；
+- Turbo 数据库环境显式透传、`REQUIRE_TEST_DATABASE` fail-closed 和 CI direct integration Step；
 - `docs/API_READ_CONTRACT.md` 和 ADR-0007。
 
 ## 3. M1.2 自动验收结果
@@ -102,6 +104,7 @@ GitHub Actions 已真实验证：
 - 锁释放后其他实例可以继续；
 - 锁连接池与 Store 连接池隔离，Store 池大小为 1 时不会因锁占用而自阻塞；
 - CI 只接受与已提交 `pnpm-lock.yaml` 一致的依赖树；
+- CI 禁止 required PostgreSQL 测试因环境变量未透传而静默 SKIP；
 - 自动测试、严格类型检查和生产构建全部通过。
 
 详细证据与排错路径见 `docs/DATABASE_ACCEPTANCE.md`。

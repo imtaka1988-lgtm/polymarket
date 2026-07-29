@@ -78,6 +78,7 @@
 - Provider/Worker 升级为 0.5.x、Database 升级为 0.3.x，M1.4 Provider 运营后端完成。
 - API 升级为 0.2.x，M1.5 版本化只读 API 完成。
 - 数据库测试跨 Workspace 包串行，避免 API 与 Worker 验收清理互相污染。
+- Turbo `test` 显式透传数据库验收环境；CI required integration Step 禁止 PostgreSQL 测试静默 SKIP。
 
 ### Known limitations
 

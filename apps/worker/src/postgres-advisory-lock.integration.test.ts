@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test, { after, before } from 'node:test';
 import { Pool } from 'pg';
 import { createEventsQuerySignature, runEventsKeysetSync } from '@forecast/provider-polymarket';
+import { integrationTestDatabaseUrl } from './integration-test-environment.js';
 import { tryAcquirePostgresAdvisoryLock } from './postgres-advisory-lock.js';
 import { PostgresEventsKeysetSyncStore } from './postgres-events-sync-store.js';
 
-const databaseUrl = process.env.TEST_DATABASE_URL;
+const databaseUrl = integrationTestDatabaseUrl();
 const integrationTest = databaseUrl === undefined ? test.skip : test;
 let firstPool: Pool | undefined;
 let secondPool: Pool | undefined;
