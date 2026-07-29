@@ -1,5 +1,10 @@
 import { Pool } from 'pg';
-import { PolymarketClient, runEventsKeysetSync } from '@forecast/provider-polymarket';
+import {
+  createEventsQuerySignature,
+  PolymarketClient,
+  runEventsKeysetSync,
+} from '@forecast/provider-polymarket';
+import { tryAcquirePostgresAdvisoryLock } from './postgres-advisory-lock.js';
 import { PostgresEventsKeysetSyncStore } from './postgres-events-sync-store.js';
 
 const client = new PolymarketClient({
@@ -24,6 +29,14 @@ const order = (process.env.POLYMARKET_SYNC_ORDER ?? 'updatedAt,id')
   .split(',')
   .map((value) => value.trim())
   .filter((value) => value.length > 0);
+const syncQuery = {
+  limit: pageSize,
+  order,
+  ascending: true,
+  closed: false,
+  includeChildren: true,
+} as const;
+const syncLockName = createEventsQuerySignature(syncQuery);
 let running = false;
 
 async function syncOnce(): Promise<void> {
@@ -33,15 +46,19 @@ async function syncOnce(): Promise<void> {
   }
 
   running = true;
+  let distributedLock: Awaited<ReturnType<typeof tryAcquirePostgresAdvisoryLock>> = null;
   try {
+    distributedLock = await tryAcquirePostgresAdvisoryLock(pool, syncLockName);
+    if (distributedLock === null) {
+      log('warn', 'provider_sync_skipped', {
+        reason: 'distributed_lock_unavailable',
+        querySignature: syncLockName,
+      });
+      return;
+    }
+
     const result = await runEventsKeysetSync(client, store, {
-      query: {
-        limit: pageSize,
-        order,
-        ascending: true,
-        closed: false,
-        includeChildren: true,
-      },
+      query: syncQuery,
       maxPages,
       resume: true,
       onProgress: (progress) => log('info', 'provider_sync_page_committed', progress),
@@ -52,6 +69,7 @@ async function syncOnce(): Promise<void> {
       message: error instanceof Error ? error.message : String(error),
     });
   } finally {
+    await distributedLock?.release();
     running = false;
   }
 }

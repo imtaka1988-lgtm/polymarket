@@ -1,20 +1,36 @@
 # Polymarket 数据接入与同步规范
 
-> 文档版本：V0.2  
-> 适用代码：`@forecast/provider-polymarket` 0.2.x、`@forecast/worker` 0.2.x  
+> 文档版本：V0.3  
+> 适用代码：`@forecast/provider-polymarket` 0.2.x、`@forecast/worker` 0.3.x  
 > 最后更新：2026-07-29  
 > 负责人：项目负责人 + AI/Codex  
-> 状态：已实现基线，生产化继续迭代
+> 状态：Event Keyset 与数据库可靠性基线已验证，实时行情待建设
 
 ## 1. 文档目的
 
-本文档说明平台如何从 Polymarket 获取事件、市场和初始价格信息，如何安全分页、保存断点、处理错误、标准化字段、写入数据库，以及发生故障时如何自查和向外部工程师求助。
+本文档说明平台如何从 Polymarket 获取事件和市场目录，如何安全分页、保存断点、处理错误、标准化字段、写入 PostgreSQL，以及发生故障时如何自查和向外部工程师求助。
 
-任何涉及 Polymarket 数据接入的代码变更，必须同步更新本文档、测试、变更日志和相关施工 Issue。代码已改但文档未改，视为未完成。
+任何 Polymarket 接入变更必须同时更新：
+
+- 代码；
+- 自动测试；
+- 本文档；
+- `docs/CURRENT_STATE.md`；
+- `CHANGELOG.md`；
+- 相关 GitHub Issue 和 PR。
+
+代码已改但文档未改，视为未完成。
 
 ## 2. 当前边界
 
-当前只接入公开数据，不进行用户钱包连接、Polymarket 真实下单、用户资产托管、真实充值提现或 Builder 订单归因。
+当前只接入公开数据，不进行：
+
+- 用户钱包连接；
+- Polymarket 真实下单；
+- 用户资产托管；
+- 真实充值提现；
+- Builder 订单归因；
+- 地区限制、KYC 或平台规则规避。
 
 Polymarket 是首个外部 Provider，不是平台内部业务真相。平台先保存原始数据，再转换为本地统一市场模型。
 
@@ -25,39 +41,51 @@ Polymarket 是首个外部 Provider，不是平台内部业务真相。平台先
 - `GET https://gamma-api.polymarket.com/events/keyset`
 - 官方文档：<https://docs.polymarket.com/api-reference/events/list-events-keyset-pagination>
 
-官方约束：
+已实现的官方约束：
 
-- 使用 `next_cursor` 作为下一页的 `after_cursor`；
-- `offset` 在 Keyset 接口中被禁止，传入会返回 422；
-- 默认 20 条，最大 500 条；
-- 响应为 `{ events, next_cursor? }`；
-- `next_cursor` 是不透明令牌，只能原样保存和传回；
-- Event 默认携带 Markets、Tags、Series 和 EventCreators；
-- Chats、Templates 和 BestLines 通过可选参数开启。
+- 使用 `next_cursor` 作为下一页 `after_cursor`；
+- Keyset 主流程禁止 `offset`；
+- 默认 20、最大 500；
+- 响应验证为 `{ events, next_cursor? }`；
+- Cursor 作为不透明令牌原样保存；
+- Event 嵌套 Market 数据进入原始层和标准层。
 
-实时行情后续使用 CLOB WebSocket；Gamma Event 接口中的 `bestBid`、`bestAsk` 和 `lastTradePrice` 只作为目录导入时的初始参考，不作为长期实时行情主通道。
+Gamma 响应中的 `bestBid`、`bestAsk` 和 `lastTradePrice` 只作为目录导入参考。正式实时行情将在 M1.3 使用 CLOB WebSocket 和 REST 对账。
 
-## 4. 为什么使用 Keyset，而不是 Offset
+## 4. 为什么使用 Keyset
 
-Offset 分页在数据持续新增或更新时，可能出现重复或遗漏。Keyset 由服务端返回游标，适合大规模、长时间、可恢复的同步。
+Offset 分页在数据持续新增或更新时可能重复或遗漏。Keyset 由服务端返回 Cursor，更适合长期、可恢复同步。
 
-正式同步使用 `/events/keyset`。普通 `/events?offset=...` 仅保留用于调试、小范围人工查询和兼容验证，不得作为正式全量同步主流程。
+正式同步：
+
+```text
+/events/keyset
+```
+
+普通 `/events?offset=...` 只允许用于调试、小范围人工查询和兼容验证，不得作为全量主流程。
 
 ## 5. 运行数据流
 
 ```text
 Worker 定时触发
-→ 读取 query_signature 对应的数据库检查点
+→ 生成稳定 Query Signature
+→ 尝试获得 PostgreSQL Advisory Lock
+→ 读取该 Query Signature 的数据库 Cursor
 → 请求 /events/keyset
 → 验证响应结构
 → 保存整页原始 JSON
 → 标准化 Event / Market / Outcome
-→ 同一数据库事务写入原始表、标准表和新检查点
-→ 提交事务后才允许使用 next_cursor 请求下一页
-→ 记录同步运行结果、页数、事件数、警告和错误
+→ 同一事务写入原始页、原始表、标准表和新 Cursor
+→ COMMIT 后才请求下一页
+→ 记录同步运行、页数、事件数、Warning 和错误
+→ finally 释放 Advisory Lock
 ```
 
-核心原则：**数据提交与游标推进必须在同一事务内完成。** 禁止先保存游标再写数据。
+核心不变量：
+
+> 页面数据、标准化数据与 Cursor 推进必须在同一个 PostgreSQL 事务中完成。
+
+禁止先保存 Cursor 再写数据。
 
 ## 6. 代码位置
 
@@ -73,23 +101,22 @@ packages/provider-polymarket/src/
 
 apps/worker/src/
 ├── index.ts
-└── postgres-events-sync-store.ts
+├── postgres-events-sync-store.ts
+├── postgres-events-sync-store.integration.test.ts
+├── postgres-advisory-lock.ts
+└── postgres-advisory-lock.integration.test.ts
 
-packages/database/src/
-└── provider-sync-schema.ts
+packages/database/
+├── src/schema.ts
+├── src/provider-sync-schema.ts
+└── drizzle/
+    ├── 0000_initial_platform.sql
+    └── meta/
 ```
 
-## 7. Keyset 请求参数
+数据库验收细节见 `docs/DATABASE_ACCEPTANCE.md`。
 
-代码支持官方页面列出的主要参数，包括分页、排序、ID/Slug、状态、标题搜索、流动性、成交量、时间窗口、Tag、Series、Game、父子 Event、Chat、Template、BestLines 和 Locale。
-
-数组参数使用重复查询参数，例如：
-
-```text
-?tag_id=1&tag_id=2
-```
-
-### 当前 Worker 默认值
+## 7. Worker 默认查询
 
 ```text
 limit=100
@@ -101,7 +128,13 @@ include_children=true
 每60秒触发一次
 ```
 
-这些值全部可以通过环境变量修改。`updatedAt,id` 是项目推荐排序；若真实接口返回 422，先核对官方支持字段，再临时改为 `id`，不能直接关闭响应验证。
+`updatedAt,id` 是项目推荐排序，不是平台永久保证。若真实接口返回 422：
+
+1. 保存状态、请求 URL 和响应；
+2. 核对官方支持字段；
+3. 临时设置 `POLYMARKET_SYNC_ORDER=id`；
+4. 更新测试、本文档和 ADR；
+5. 不得关闭响应验证掩盖问题。
 
 ## 8. 环境变量
 
@@ -118,79 +151,129 @@ POLYMARKET_RETRY_MAX_DELAY_MS=8000
 WORKER_DATABASE_POOL_SIZE=5
 ```
 
-建议 Page Size 为 50–200。不要一开始使用最大 500，因为嵌套 Markets 会使响应很大。
+建议 Page Size 50–200。嵌套 Markets 可能使单页响应很大，不建议直接使用最大 500。
 
 ## 9. 数据库表
 
-### `provider_sync_checkpoints`
+### 同步控制
 
-每个固定查询条件保存 Provider、资源类型、Query Signature、下一 Cursor、累计页数和事件数，以及最后成功、失败和错误信息。
+- `provider_sync_checkpoints`：Cursor、累计页数、累计事件数和最近错误；
+- `provider_sync_runs`：每次运行的 running/completed/partial/failed 状态；
+- `provider_sync_pages`：请求 Cursor、响应 Cursor、URL、完整原始 JSON、Warning 和 Page Key。
 
-### `provider_sync_runs`
+### 原始层
 
-保存每一次 Worker 执行的 running/completed/partial/failed 状态、开始结束时间、页数、事件数、警告数、剩余 Cursor 和错误。
+- `provider_events`；
+- `provider_markets`。
 
-### `provider_sync_pages`
+### 标准化层
 
-保存每一页 Request Cursor、Response Cursor、Request URL、完整原始 JSON、Event 数量、解析警告和 SHA-256 Page Key。
+- `markets`；
+- `market_outcomes`。
 
-### 原始和标准化表
-
-- `provider_events`
-- `provider_markets`
-- `markets`
-- `market_outcomes`
+正式迁移由 Drizzle 生成并提交在 `packages/database/drizzle/`。CI 会检查 Schema 与迁移无漂移并真实执行迁移。
 
 ## 10. Query Signature
 
-Cursor 只对生成它的查询条件有效。系统删除 `afterCursor` 后，对其他参数稳定序列化：
+Cursor 只对原始查询条件有效。系统去除 `afterCursor` 后稳定序列化其余参数：
 
 ```text
 polymarket:events-keyset:v1:{...固定查询条件...}
 ```
 
-修改 closed、标签、排序、日期、include_children 或 Locale 会产生新的同步链。禁止把旧查询 Cursor 手工复制给新查询。
+修改状态、Tag、排序、日期、子事件或 Locale 会生成新的同步链。
+
+Query Signature 同时作为 PostgreSQL Advisory Lock 名称。不同查询可以并行，同一查询在同一时刻只允许一个 Worker 执行。
 
 ## 11. 字段解析与标准化
 
-官方部分字段可能是 JSON 字符串而不是数组：
+以下字段可能是 JSON 字符串而不是数组：
 
-- `outcomes`
-- `outcomePrices`
-- `clobTokenIds`
-- `shortOutcomes`
+- `outcomes`；
+- `outcomePrices`；
+- `clobTokenIds`；
+- `shortOutcomes`。
 
-解析器同时接受数组和 JSON 字符串。非法 JSON、非字符串元素或数量不一致时，原始值保留、生成结构化 Warning，并且不虚构 Outcome。
+解析器同时接受数组和 JSON 字符串。非法 JSON、非字符串元素或数量不一致时：
+
+- 保留原始数据；
+- 生成结构化 Warning；
+- 不虚构 Outcome 或 Token ID；
+- 不因单个可恢复字段错误清空历史数据。
 
 ### 市场状态映射
 
 ```text
-archived=true                 → archived
-closed=true                   → closed
-active=false                  → suspended
-acceptingOrders=true          → open
-其他                           → pending_review
+archived=true        → archived
+closed=true          → closed
+active=false         → suspended
+acceptingOrders=true → open
+其他                 → pending_review
 ```
 
-不会仅凭外部字段把市场直接标为本地 `resolved`。正式结算必须进入独立结算证据链。
+不会仅凭外部字段把市场直接标为本地 `resolved`。结算必须进入独立证据链。
 
 ### 市场类型映射
 
-- 体育字段存在：`sports`
-- Yes/No：`binary`
-- 超过两个 Outcome：`multi_outcome`
+- 有体育字段：`sports`；
+- Yes/No：`binary`；
+- 超过两个 Outcome：`multi_outcome`。
 
 ## 12. 重试策略
 
-自动重试 429、500、502、503、504、网络错误和超时。不自动重试 400、401/403、404、422 和响应结构错误。
+自动重试：
 
-默认指数退避：500ms 起，最大 8 秒，最多 4 次，包含随机抖动。存在 `Retry-After` 时优先尊重服务端值。
+- 429；
+- 500、502、503、504；
+- 网络错误；
+- 超时。
 
-## 13. 同步运行锁
+不自动重试：
 
-Worker 当前使用进程内 `running` 标志避免同一进程重入。生产多实例运行前必须增加 PostgreSQL Advisory Lock 或分布式任务锁。
+- 400；
+- 401/403；
+- 404；
+- 422；
+- 响应结构错误。
 
-## 14. 日志事件
+默认最多 4 次，500ms 起步，最大 8 秒，带随机抖动；存在 `Retry-After` 时优先使用服务端值。
+
+## 13. 运行锁
+
+Worker 使用两层保护。
+
+### 进程内锁
+
+`running` 标志防止同一进程的定时器重入。
+
+### PostgreSQL Advisory Lock
+
+`pg_try_advisory_lock(hashtextextended(query_signature, 0))` 防止多个 Worker 实例同时推进同一 Cursor。
+
+锁由专用 PoolClient Session 持有，在同步结束或失败后的 `finally` 中释放。另一个实例无法获得锁时记录：
+
+```text
+provider_sync_skipped
+reason=distributed_lock_unavailable
+```
+
+自动集成测试已验证：互斥有效，释放后其他实例可以获得锁。
+
+## 14. 幂等与原子性
+
+唯一身份：
+
+- Event：`provider + provider_event_id`；
+- Market：`provider + provider_market_id`；
+- Outcome：`market_id + sort_order`；
+- Raw Page：SHA-256 `page_key`；
+- Checkpoint：`provider + resource_type + query_signature`。
+
+同一页面重复执行不会增加重复记录。
+
+持久化中途发生 SQL 错误时，Raw Page、Event、Market、Outcome 和 Cursor 全部回滚。该行为已由 PostgreSQL 集成测试验证。
+
+## 15. 日志事件
 
 ```text
 provider_sync_page_committed
@@ -200,38 +283,43 @@ provider_sync_skipped
 worker_shutdown_started
 ```
 
-每条日志为 JSON。外部求助时优先提供这些事件附近的日志，不要提供 `.env`。
+每条日志为 JSON。`provider_sync_skipped` 的原因可能是：
 
-## 15. 本地搭建步骤
+- `previous_run_still_active`；
+- `distributed_lock_unavailable`。
 
-```powershell
-git pull
-pnpm install
-pnpm db:generate
-pnpm db:migrate
-pnpm test
-pnpm verify
-pnpm dev
-```
+外部求助时优先提供相关时间范围的脱敏 JSON 日志。
 
-若 `db:generate` 产生迁移文件，必须通过 PR 提交，不能只存在本机。
+## 16. 自动验收
 
-## 16. 成功标志
+GitHub Actions 每次 PR 和 main Push 自动：
 
-数据库出现同步运行、原始页、Cursor、Event、Market 和 Outcome 记录。Worker 日志出现：
+1. 启动 PostgreSQL 16；
+2. 检查 Schema 与正式迁移一致；
+3. 执行数据库迁移；
+4. 运行 Provider 单元测试；
+5. 运行 Store PostgreSQL 集成测试；
+6. 运行 Advisory Lock 集成测试；
+7. 严格 TypeScript 检查；
+8. 生产构建。
 
-```text
-provider_sync_page_committed
-provider_sync_completed
-```
+PR #4 已验证：
 
-重复启动后应从数据库 Cursor 继续，而不是永远从第一页开始。
+- 建表；
+- 原子页面提交；
+- Cursor 恢复；
+- 重复执行幂等；
+- 故障整页回滚；
+- 多实例锁；
+- 类型检查和构建。
+
+项目负责人不需要手工判断这些技术结果。
 
 ## 17. 常见故障
 
 ### 422：Offset is not allowed
 
-检查是否调用旧 `/events` 客户端或手工拼接 URL。
+检查是否调用旧 `/events` 客户端或手工拼接 Offset。
 
 ### 422：Order 字段不支持
 
@@ -241,50 +329,84 @@ provider_sync_completed
 POLYMARKET_SYNC_ORDER=id
 ```
 
-保存响应，确认官方文档后更新默认值、测试和本文档。
+随后保存响应并更新测试、文档和 ADR。
 
 ### 503：Keyset pagination is not configured
 
-系统会退避重试。连续失败后保留旧数据和旧 Cursor，不能清库，也不能静默切换 Offset 继续写入。
+系统会退避重试。连续失败后保留旧数据和 Cursor，不清库、不静默切 Offset。
 
 ### Cursor 不前进
 
-系统主动终止以避免死循环。保存原始页、Request/Response Cursor 和 Run ID。
+系统主动停止，防止死循环。保存 Run ID、Query Signature、Request/Response Cursor 和原始页。
 
-### 数据库表不存在
+### 数据库迁移失败
 
-```powershell
-pnpm db:generate
-pnpm db:migrate
-```
+查看 `docs/DATABASE_ACCEPTANCE.md`，检查 Migration、Schema、Enum、Foreign Key 和 CI PostgreSQL 状态。
+
+### 分布式锁一直不可用
+
+检查是否有旧 Worker Session 未结束、进程是否失去正常关闭能力，以及数据库连接是否长期占用。不要手工删除 Cursor。
 
 ### Outcome 数量不一致
 
-查看 `provider_sync_pages.raw_payload` 和 Warning。不要手工编造缺失 Token ID。
+检查 `provider_sync_pages.raw_payload` 和 Warning，不手工编造 Token ID。
 
-## 18. 外部求助最小资料
+## 18. 外部求助资料
 
-提供当前 Commit、时间和时区、Run ID、Query Signature、Request URL、HTTP 状态、相关 JSON 日志、原始页 ID、doctor/health/test/verify 结果和脱敏 Support Bundle。
+提供：
 
-不要提供 `.env`、数据库密码、Session Secret、完整生产数据库或用户个人信息。
+- 当前 Commit、PR 和 CI Run ID；
+- 时间与时区；
+- Run ID 和 Query Signature；
+- Request URL 和 HTTP 状态；
+- Request/Response Cursor；
+- 原始页 ID；
+- 脱敏 JSON 日志；
+- `docs/AI_PROJECT_HANDOFF.md`；
+- `docs/DATABASE_ACCEPTANCE.md`；
+- 本文档。
 
-## 19. 测试覆盖
+禁止提供 `.env`、密码、Token、私钥、完整生产数据库或用户数据。
 
-当前自动测试覆盖：Keyset URL、不产生 Offset、数组参数、503 重试、Cursor 解析、字符串数组解析、两页同步和检查点推进。
+## 19. 当前测试覆盖
 
-仍需补充：真实官方 Fixture、PostgreSQL 容器集成测试、多实例锁、大数据性能和 CLOB WebSocket 断线测试。
+已覆盖：
 
-## 20. 当前完成与后续
+- Keyset URL 和禁止 Offset；
+- 数组参数；
+- 503 重试；
+- Cursor 解析和推进；
+- 字符串数组解析；
+- 两页同步编排；
+- 正式迁移；
+- 所需表存在；
+- 页面原子提交；
+- Cursor 恢复；
+- 重复页面幂等；
+- SQL 故障回滚；
+- PostgreSQL Advisory Lock 互斥与释放。
 
-已完成 Keyset 客户端、Cursor 恢复、原始页保存、标准化、PostgreSQL 原子提交、运行记录、重试、单进程防重入、自动测试和文档。
+仍需补充：
 
-后续重点：
+- 脱敏真实官方 Fixture；
+- 长期契约变化检测；
+- 大数据量性能测试；
+- CLOB WebSocket 断线和重订阅测试；
+- 运行指标与告警。
 
-1. 生成并提交正式数据库迁移；
-2. 接入 CLOB Market WebSocket；
-3. REST 行情对账；
-4. 关闭和结算市场滚动回查；
-5. 多实例分布式锁；
-6. 管理后台同步监控；
-7. 数据延迟和失败告警；
-8. Provider Fixture 契约版本管理。
+## 20. 当前完成度与下一步
+
+工程评估：
+
+- Event Keyset 目录同步模块：约 96%；
+- 数据库迁移和持久化可靠性：约 97%；
+- 整个 M1 数据闭环：约 57%。
+
+下一阶段是 M1.3：
+
+1. CLOB Market WebSocket；
+2. Token 订阅注册表；
+3. 断线重连与全量重订阅；
+4. REST 初始快照和周期对账；
+5. 价格快照持久化；
+6. 延迟和断线可观测性。

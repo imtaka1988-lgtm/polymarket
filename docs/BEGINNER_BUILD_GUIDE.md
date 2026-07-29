@@ -1,19 +1,42 @@
 # 零基础搭建与验收手册
 
-> 文档版本：V0.2  
+> 文档版本：V0.3  
 > 适用系统：Windows 10/11  
-> 假设：你不懂编程，不跳步，每一步成功后再继续。
+> 假设：你不懂编程。技术正确性由 AI/工程师和 GitHub Actions 验收，项目负责人不需要手工判断数据库事务或代码逻辑。
 
-## 0. 六个基础词
+## 0. 七个基础词
 
-- 仓库：项目所有代码和文档，GitHub 保存远程副本。
-- PowerShell：输入命令的窗口。
-- 依赖：项目使用的现成软件包。
-- 数据库：保存用户、市场、预测、积分、同步记录和结算。
-- 环境变量：本机配置和秘密，不放进代码。
-- 数据迁移：把代码中的数据库设计安全创建到 PostgreSQL。
+- 仓库：项目所有代码和文档，GitHub 保存远程副本；
+- PowerShell：输入命令的窗口；
+- 依赖：项目使用的现成软件包；
+- 数据库：保存用户、市场、预测、积分、同步记录和结算；
+- 环境变量：本机配置和秘密，不放进代码；
+- 数据迁移：把代码中的数据库设计安全创建到 PostgreSQL；
+- CI：GitHub 自动执行迁移、测试、类型检查和构建。
 
-## 1. 安装 Git
+## 1. 你的责任边界
+
+你负责：
+
+- 控制 GitHub 和云服务账号；
+- 保管密码和密钥；
+- 确认产品和视觉；
+- 反馈页面体验；
+- 在确实需要你的电脑或账号时按步骤操作。
+
+AI/工程师负责：
+
+- 写代码；
+- 生成迁移；
+- 自动测试；
+- CI 验收；
+- 定位 Bug；
+- 更新文档；
+- 说明真实完成度。
+
+不要因为你不懂代码而自行尝试删除文件、重置数据库或修改配置。
+
+## 2. 安装 Git
 
 安装 Git for Windows，保持默认选项。验证：
 
@@ -23,7 +46,7 @@ git --version
 
 成功标志：显示 `git version ...`。
 
-## 2. 安装 Node.js 24 LTS
+## 3. 安装 Node.js 24 LTS
 
 ```powershell
 node -v
@@ -31,7 +54,7 @@ node -v
 
 必须以 `v24.` 开头。
 
-## 3. 启用 pnpm
+## 4. 启用 pnpm
 
 ```powershell
 corepack enable
@@ -41,7 +64,7 @@ pnpm -v
 
 成功标志：11.x。
 
-## 4. 安装 Docker Desktop
+## 5. 安装 Docker Desktop
 
 启动后执行：
 
@@ -50,7 +73,7 @@ docker --version
 docker compose version
 ```
 
-## 5. 下载项目
+## 6. 下载项目
 
 ```powershell
 cd D:\
@@ -62,7 +85,7 @@ Get-Location
 Get-ChildItem
 ```
 
-必须看到 `package.json`、`apps`、`packages`、`docs`。
+必须看到 `AGENTS.md`、`package.json`、`apps`、`packages` 和 `docs`。
 
 已经下载过时：
 
@@ -74,7 +97,7 @@ git pull
 
 若 `git status` 显示不认识的修改，先截图，不要执行 `git reset --hard`。
 
-## 6. 创建本地配置
+## 7. 创建本地配置
 
 首次：
 
@@ -94,7 +117,7 @@ POLYMARKET_SYNC_ORDER=updatedAt,id
 
 初次不要随意改大页数或缩短同步间隔。
 
-## 7. 安装依赖
+## 8. 安装依赖
 
 ```powershell
 pnpm install
@@ -102,9 +125,9 @@ pnpm install
 
 成功标志：无红色错误，出现 `node_modules` 和 `pnpm-lock.yaml`。
 
-`pnpm-lock.yaml` 必须提交 GitHub，用于锁定依赖版本。若仓库没有锁文件，第一次安装后单独创建 PR 提交。
+`pnpm-lock.yaml` 必须提交 GitHub，用于锁定依赖版本。不要手工编辑该文件。
 
-## 8. 启动数据库和 Redis
+## 9. 启动本地数据库和 Redis
 
 ```powershell
 docker compose up -d
@@ -115,42 +138,71 @@ docker compose ps
 
 停止：`docker compose stop`。  
 删除容器但保留数据：`docker compose down`。  
-`docker compose down -v` 会删除本地数据，只在明确重置时使用。
+`docker compose down -v` 会删除本地数据，除非文档明确要求重置，否则不要使用。
 
-## 9. 生成和执行数据库迁移
+## 10. 本地执行正式迁移
+
+正式迁移已由 Drizzle 生成并提交在：
+
+```text
+packages/database/drizzle/
+```
+
+本地只需要执行：
 
 ```powershell
-pnpm db:generate
 pnpm db:migrate
 ```
 
-目的：创建 Event、Market、同步 Cursor、运行记录、原始页、账本和结算等数据表。
+通常不需要项目负责人运行 `pnpm db:generate`。该命令用于工程师修改 Schema 后生成新迁移，生成结果必须通过 PR 审查。
 
-成功标志：无红色错误，`packages/database/drizzle` 出现迁移文件，数据库完成迁移。
+禁止：
 
-- 迁移文件属于项目代码，必须提交 GitHub；
-- 不要手工在生产数据库创建表；
-- 不要删除已经执行过的迁移；
-- 迁移失败时保存完整错误和当前 Git Commit。
+- 手工创建生产表；
+- 删除已执行迁移；
+- 修改历史迁移掩盖错误；
+- 使用 `drizzle-kit push` 替代生产迁移。
 
-## 10. 环境自检
+## 11. GitHub 已自动完成的技术验收
+
+每次 PR 和 main 更新，GitHub Actions 会自动：
+
+```text
+启动 PostgreSQL 16
+→ 检查 Schema 与迁移无漂移
+→ 执行正式迁移
+→ 运行 Provider 单元测试
+→ 运行 PostgreSQL Store 集成测试
+→ 验证原子提交、Cursor 恢复、幂等和故障回滚
+→ 验证 Advisory Lock 多实例互斥
+→ 严格类型检查
+→ 生产构建
+```
+
+项目负责人不需要手工检查 SQL 表数量、事务回滚或锁竞争。CI 全绿是技术验收证据。
+
+详细说明：`docs/DATABASE_ACCEPTANCE.md`。
+
+## 12. 环境自检
 
 ```powershell
 pnpm doctor
 ```
 
-它检查 Node、pnpm、Docker、`.env`、PostgreSQL、Redis 和 Polymarket 公开 API。失败时先修复。
+它检查 Node、pnpm、Docker、`.env`、PostgreSQL、Redis 和 Polymarket 公开 API。
 
-## 11. 自动测试和构建验证
+## 13. 本地测试和构建
+
+需要调试本机时：
 
 ```powershell
 pnpm test
 pnpm verify
 ```
 
-`pnpm test` 验证 Keyset URL、Cursor、重试和字段解析。`pnpm verify` 执行测试、类型检查和生产构建。
+本地没有 `TEST_DATABASE_URL` 时，PostgreSQL 集成测试可能跳过；完整数据库验收以 GitHub Actions 为准。
 
-## 12. 启动项目
+## 14. 启动项目
 
 ```powershell
 pnpm dev
@@ -161,36 +213,43 @@ pnpm dev
 - http://localhost:3000
 - http://localhost:4000/api/v1/health
 
-Worker 会访问 Polymarket Keyset Event API 并写入 PostgreSQL。成功日志至少包含：
+Worker 成功日志至少可能包含：
 
 ```text
 provider_sync_page_committed
 provider_sync_completed
 ```
 
-## 13. 验证 Provider 同步
+若另一个 Worker 已持有同一同步锁，可能看到：
 
-数据库应出现：
+```text
+provider_sync_skipped
+reason=distributed_lock_unavailable
+```
 
-- `provider_sync_runs`
-- `provider_sync_pages`
-- `provider_sync_checkpoints`
-- `provider_events`
-- `provider_markets`
-- `markets`
-- `market_outcomes`
+这不是数据错误，表示另一个实例正在安全执行同步。
 
-重复启动 Worker 后，应继续 Cursor，而不是永远只读第一页。
+## 15. Provider 同步数据
 
-若出现 `provider_sync_failed`，阅读 `docs/POLYMARKET_DATA_INTEGRATION.md` 和 `docs/TROUBLESHOOTING_AND_SUPPORT.md`。
+数据库会使用：
 
-## 14. 健康检查
+- `provider_sync_runs`；
+- `provider_sync_pages`；
+- `provider_sync_checkpoints`；
+- `provider_events`；
+- `provider_markets`；
+- `markets`；
+- `market_outcomes`。
+
+重复启动后会从数据库 Cursor 继续，不会永远只读第一页。
+
+## 16. 健康检查
 
 ```powershell
 pnpm health
 ```
 
-## 15. 修改前
+## 17. 修改前
 
 ```powershell
 git status
@@ -200,60 +259,44 @@ git switch -c feature/short-description
 
 禁止在 main 直接写大量改动。
 
-## 16. 每次改动必须同步文档
+## 18. 每次改动必须同步文档
 
-修改 Provider、数据库、Worker 或环境变量时，至少检查：
+修改 Provider、数据库、Worker、CI 或环境变量时，至少检查：
 
-- `README.md`
-- `CHANGELOG.md`
-- `docs/ARCHITECTURE_AND_DATA.md`
-- `docs/POLYMARKET_DATA_INTEGRATION.md`
-- `docs/BEGINNER_BUILD_GUIDE.md`
-- `docs/TROUBLESHOOTING_AND_SUPPORT.md`
-- 对应 ADR 和 GitHub Issue
+- `AGENTS.md`；
+- `README.md`；
+- `CHANGELOG.md`；
+- `docs/CURRENT_STATE.md`；
+- `docs/AI_PROJECT_HANDOFF.md`；
+- `docs/ARCHITECTURE_AND_DATA.md`；
+- `docs/POLYMARKET_DATA_INTEGRATION.md`；
+- `docs/DATABASE_ACCEPTANCE.md`；
+- `docs/BEGINNER_BUILD_GUIDE.md`；
+- `docs/TROUBLESHOOTING_AND_SUPPORT.md`；
+- 对应 ADR 和 GitHub Issue。
 
-未更新文档视为功能未完成。
+文档未更新，功能视为未完成。
 
-## 17. 发布前
-
-```powershell
-pnpm verify
-git status
-```
-
-检查测试、类型、构建、迁移、文档、秘密和回滚说明。
-
-## 18. 未知 Bug
+## 19. 未知 Bug
 
 1. 记录发生时间和时区；
 2. 记录操作步骤；
 3. 截图；
 4. 保存完整错误；
-5. 保存 Worker JSON 日志；
-6. 运行 doctor、health、test、verify；
-7. 记录 Git Commit；
+5. 记录 Git Commit、PR 和 CI Run ID；
+6. 保存相关 Worker JSON 日志；
+7. 运行 doctor、health、test、verify；
 8. 运行 support-bundle；
-9. 阅读排错文档；
+9. 阅读专项排错文档；
 10. 把脱敏材料交给 AI 或外部工程师。
 
-## 19. 验收表
+## 20. 项目负责人最低验收表
 
-- [ ] Git 可用
-- [ ] Node 24.x
-- [ ] pnpm 11.x
-- [ ] Docker 正常
-- [ ] 仓库下载完成
-- [ ] `.env` 已创建且未提交
-- [ ] 依赖安装完成
-- [ ] `pnpm-lock.yaml` 已提交
-- [ ] PostgreSQL healthy
-- [ ] Redis healthy
-- [ ] 数据迁移完成
-- [ ] doctor 通过
-- [ ] test 通过
-- [ ] verify 通过
-- [ ] Web 可打开
-- [ ] API health 正常
-- [ ] Worker Keyset 同步成功
-- [ ] 同步运行、原始页和 Cursor 已入库
-- [ ] 第二次同步能够恢复 Cursor
+- [ ] GitHub 仓库可以访问；
+- [ ] main 分支 CI 全绿；
+- [ ] `AGENTS.md` 和当前状态文档存在；
+- [ ] `.env` 未提交；
+- [ ] 页面体验符合当前阶段预期；
+- [ ] 发现异常时能提供截图、时间、Commit 和 CI Run ID。
+
+技术测试、数据库事务和分布式锁由 CI 验收，不要求项目负责人理解代码实现。

@@ -1,6 +1,6 @@
 # 系统架构、数据与核心规则
 
-> 文档版本：V0.2  
+> 文档版本：V0.3  
 > 最后更新：2026-07-29
 
 ## 1. 架构选择
@@ -64,7 +64,7 @@ Polymarket / Future Providers
 → COMMIT
 ```
 
-任何一步失败，事务回滚，Cursor 不推进。
+任何一步失败，事务回滚，Cursor 不推进。该行为已由 PostgreSQL 集成测试验证。
 
 ### 4.3 同步表
 
@@ -74,11 +74,62 @@ Polymarket / Future Providers
 - `provider_events`：原始 Event；
 - `provider_markets`：原始 Market。
 
-### 4.4 实时行情边界
+### 4.4 运行互斥
 
-Gamma Keyset 解决目录、规则和初始字段，不解决长期实时价格。后续 CLOB WebSocket 将更新当前价格缓存和历史价格快照，REST 用于断线校准。
+Worker 使用两层锁：
 
-## 5. 市场状态机
+1. 进程内 `running` 标志；
+2. PostgreSQL Session 级 Advisory Lock。
+
+Advisory Lock 的逻辑名称使用 Query Signature。多个不同查询可并行，同一 Query Signature 同时只能由一个 Worker 实例执行。
+
+代码位置：
+
+- `apps/worker/src/postgres-advisory-lock.ts`
+- `apps/worker/src/postgres-advisory-lock.integration.test.ts`
+
+### 4.5 实时行情边界
+
+Gamma Keyset 解决目录、规则和初始字段，不解决长期实时价格。下一阶段 CLOB WebSocket 将更新当前价格缓存和历史价格快照，REST 用于初始快照和断线校准。
+
+## 5. 数据库迁移与验收
+
+正式迁移位于：
+
+```text
+packages/database/drizzle/
+```
+
+Drizzle Schema 位于：
+
+```text
+packages/database/src/schema.ts
+packages/database/src/provider-sync-schema.ts
+```
+
+GitHub Actions 每次 PR 和 main Push 自动：
+
+```text
+启动 PostgreSQL 16
+→ 重新检查 Schema 与迁移一致
+→ 执行 pnpm db:migrate
+→ 运行 PostgreSQL 集成测试
+→ 类型检查
+→ 生产构建
+```
+
+CI 已验证：
+
+- 初始迁移可执行；
+- 同步所需表存在；
+- 页面和 Cursor 原子提交；
+- 重复执行幂等；
+- SQL 故障整页回滚；
+- Advisory Lock 互斥和释放。
+
+完整规范见 `docs/DATABASE_ACCEPTANCE.md`。
+
+## 6. 市场状态机
 
 ```text
 draft → pending_review → open → suspended/closed → resolving → resolved → archived
@@ -86,7 +137,7 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 
 异常可进入 `cancelled`；resolved 错误不能删除，必须新结算版本冲正。Provider 导入阶段使用保守映射，`closed=true` 不自动等同于本地 `resolved`。
 
-## 6. 报价
+## 7. 报价
 
 ```text
 请求报价 → 服务器最新快照 → quote_id/expires_at → 用户确认
@@ -95,13 +146,13 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 
 必须保存价格、数据源、快照 ID、报价时间、失效时间和接受时间。
 
-## 7. 账本
+## 8. 账本
 
 余额只是视图，账本流水是真相。双重记账要求每笔交易借贷相等、业务有唯一幂等键、历史不删除、修正通过反向交易、管理员调整有理由和审计。
 
 资产代码如 `PLAY_COIN`、`RANK_POINT`、`XP`，不能隐式转换。
 
-## 8. 结算
+## 9. 结算
 
 ```text
 检测结果 → 保存证据 → reviewing → 确认规则版本 → calculating
@@ -110,15 +161,15 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 
 重复执行依靠幂等不重复入账。错误结算保留原记录，创建 reversal 版本，冲正并重结算。
 
-## 9. Transactional Outbox
+## 10. Transactional Outbox
 
 业务数据和事件同事务写入；Worker 成功后写 `published_at`，失败增加尝试次数并退避，超限人工处理。
 
-## 10. 数据保留
+## 11. 数据保留
 
 价格数据分层降采样。结算证据、账本、同步原始页和审计不能按普通日志随意删除。Provider 原始页长期保留周期将在 M1 运维策略中确定。
 
-## 11. 可观测性
+## 12. 可观测性
 
 当前同步日志事件：
 
@@ -126,28 +177,40 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 - `provider_sync_completed`
 - `provider_sync_failed`
 - `provider_sync_skipped`
+- `worker_shutdown_started`
+
+`provider_sync_skipped` 可区分进程重入和分布式锁不可用。
 
 后续接入最后成功时间、同步延迟、Cursor 停滞、解析 Warning、连续失败、原始页大小和数据库写入耗时指标。
 
-## 12. 扩展
+## 13. 扩展
 
 社交、房间、团队、任务、成就、赛季、用户市场、会员、AI 和 API 通过新增模块。真实支付、托管和真金下注必须独立系统。
 
 新的 Provider 必须实现：
 
 ```text
-原始数据获取 → 结构验证 → 标准化 → 原始证据保存 → 可恢复检查点 → 可观测运行记录
+原始数据获取
+→ 结构验证
+→ 标准化
+→ 原始证据保存
+→ 正式迁移
+→ 可恢复检查点
+→ 原子提交
+→ 多实例互斥
+→ 自动集成测试
+→ 可观测运行记录
 ```
 
-## 13. 微服务拆分触发
+## 14. 微服务拆分触发
 
 仅在 Provider 同步影响 API、结算需独立扩容、通知量大、团队独立或合规隔离时拆分。优先候选：Provider、Realtime、Settlement、Notifications。
 
-## 14. 当前已知架构缺口
+## 15. 当前已知架构缺口
 
-- Worker 仅有进程内防重入，多实例需要 PostgreSQL Advisory Lock；
 - CLOB WebSocket 尚未实现；
+- REST 初始行情和周期对账尚未实现；
 - 关闭和结算市场的独立滚动回查尚未实现；
-- PostgreSQL 容器集成测试尚未进入 CI；
+- 真实官方 Fixture 和长期契约监控尚未实现；
 - 管理后台尚不能查看同步运行和 Warning；
-- 数据迁移文件需要生成并提交。
+- 数据延迟和连续失败告警尚未实现。
