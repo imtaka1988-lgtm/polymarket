@@ -126,6 +126,8 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 
 - 进程内防重入；
 - PostgreSQL Advisory Lock；
+- Advisory Lock 与 Event Store 独立连接池；
+- 失败页不推进 Checkpoint 累计计数；
 - Cursor 恢复；
 - 原子页面提交；
 - 结构化日志。
@@ -174,7 +176,7 @@ Worker 定时触发
 
 ## 8. 当前已完成
 
-以 `main` 最新合并状态为准。PR #4 合并后包括：
+以 `main` 最新合并状态为准。PR #4 与 PR #5 合并后包括：
 
 - Monorepo、Web/API/Worker 边界；
 - 核心领域和数据库 Schema；
@@ -193,6 +195,8 @@ Worker 定时触发
 - 故障整页回滚；
 - 进程内防重入；
 - PostgreSQL Advisory Lock；
+- 单连接 Event Store 在持锁期间不自阻塞；
+- 失败页面不会污染累计页数和累计事件数；
 - Provider 单元测试；
 - PostgreSQL Store 和 Lock 集成测试；
 - CI 测试、类型检查和生产构建；

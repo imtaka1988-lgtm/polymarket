@@ -175,6 +175,8 @@ pnpm db:migrate
 → 运行 PostgreSQL Store 集成测试
 → 验证原子提交、Cursor 恢复、幂等和故障回滚
 → 验证 Advisory Lock 多实例互斥
+→ 验证锁连接池与业务连接池隔离，单连接 Store 不自阻塞
+→ 验证失败页不进入 Checkpoint 累计计数
 → 严格类型检查
 → 生产构建
 ```

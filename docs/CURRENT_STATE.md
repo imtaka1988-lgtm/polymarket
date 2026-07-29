@@ -12,6 +12,7 @@
 - PR #1：工程、架构、文档、自检与 CI 基线；
 - PR #3：Polymarket Events Keyset 可恢复同步；
 - PR #4：正式迁移、PostgreSQL 自动验收、分布式锁和 AI/外援接管文档（本状态随 PR #4 合并生效）。
+- PR #5：同步连接池隔离、失败页计数修复、单连接 Store 验收和冻结依赖基线。
 
 ## 2. 当前已经具备
 
@@ -32,7 +33,11 @@
 - 持久化故障整页回滚；
 - 进程内防重入；
 - PostgreSQL Advisory Lock 多实例互斥；
+- Advisory Lock 使用独立连接池，不占用 Store 业务连接；
+- Store 连接池大小为 1 时完整同步仍可继续；
+- 失败页面不会推进 Cursor、累计页数或累计事件数；
 - Provider 单元测试和 PostgreSQL 集成测试；
+- `pnpm-lock.yaml` 和 CI 冻结依赖安装；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md`；
 - AI/外部工程师完整接管文档；
@@ -49,8 +54,11 @@ GitHub Actions 已真实验证：
 - Cursor 可以从数据库恢复；
 - 同一页面重复执行不产生重复记录；
 - SQL 中途失败时页面、Event、Market、Outcome 和 Cursor 全部回滚；
+- SQL 中途失败时失败页不会进入累计页数和累计事件数；
 - 两个 Worker 会话不能同时持有同一 Query Signature 的 Advisory Lock；
 - 锁释放后其他实例可以继续；
+- 锁连接池与 Store 连接池隔离，Store 池大小为 1 时不会因锁占用而自阻塞；
+- CI 只接受与已提交 `pnpm-lock.yaml` 一致的依赖树；
 - 自动测试、严格类型检查和生产构建全部通过。
 
 详细证据与排错路径见 `docs/DATABASE_ACCEPTANCE.md`。

@@ -19,7 +19,9 @@
 - Schema 与迁移漂移检查；
 - PostgreSQL Store 集成测试：建表、原子提交、Cursor 恢复、重复同步和故障回滚；
 - PostgreSQL Advisory Lock 多实例互斥；
-- Advisory Lock 集成测试；
+- Advisory Lock 独立连接池和单连接 Store 完整同步集成测试；
+- 失败页面不污染 Checkpoint 累计页数和事件数的回归测试；
+- `pnpm-lock.yaml` 可重复依赖基线；
 - 根目录 `AGENTS.md`；
 - `docs/AI_PROJECT_HANDOFF.md`；
 - `docs/CURRENT_STATE.md`；
@@ -30,8 +32,10 @@
 ### Changed
 
 - Worker 从 Offset 首页面连通性测试升级为可恢复 Keyset 同步；
-- Worker 从单进程防重入升级为进程内锁加 PostgreSQL Advisory Lock；
+- Worker 从单进程防重入升级为进程内锁加 PostgreSQL Advisory Lock，锁连接与业务 Store 连接池隔离；
+- 页面累计计数只在数据库事务提交成功后推进；
 - `pnpm verify` 和 CI 增加自动测试；
+- CI 改为冻结锁文件安装依赖，禁止依赖解析结果静默漂移；
 - CI 在测试前检查迁移漂移并执行正式迁移；
 - 数据库技术验收从项目负责人手工操作改为 GitHub Actions 自动验证；
 - README 将 AI、新聊天和外部工程师接管入口置于首位；

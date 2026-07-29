@@ -82,6 +82,8 @@ Worker 使用两层锁：
 2. PostgreSQL Session 级 Advisory Lock。
 
 Advisory Lock 的逻辑名称使用 Query Signature。多个不同查询可并行，同一 Query Signature 同时只能由一个 Worker 实例执行。
+锁使用独立的单连接 PostgreSQL Pool；Event Store 使用 `WORKER_DATABASE_POOL_SIZE`
+控制的业务 Pool。两者不得复用，否则业务 Pool 只有一个连接时，锁会占用唯一连接并阻塞后续同步查询。
 
 代码位置：
 
@@ -125,7 +127,8 @@ CI 已验证：
 - 页面和 Cursor 原子提交；
 - 重复执行幂等；
 - SQL 故障整页回滚；
-- Advisory Lock 互斥和释放。
+- 失败页不进入 Checkpoint 累计计数；
+- Advisory Lock 互斥、释放和单连接 Store 不自阻塞。
 
 完整规范见 `docs/DATABASE_ACCEPTANCE.md`。
 

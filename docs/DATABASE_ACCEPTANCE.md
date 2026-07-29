@@ -79,12 +79,15 @@ apps/worker/src/postgres-advisory-lock.integration.test.ts
 - Run 状态可以更新为 partial/completed；
 - 同一页重复执行不会产生重复原始页、Event、Market 或 Outcome；
 - 持久化中途失败时，原始页、Event、Market、Outcome 和 Cursor 全部回滚。
+- 失败页不会进入 Checkpoint 的累计页数和累计事件数。
 
 ### Advisory Lock 集成测试验证
 
 - 第一个 Worker 会话可以获得指定 Query Signature 的锁；
 - 第二个 Worker 会话不能同时获得同一锁；
 - 第一个会话释放后，第二个会话可以获得锁。
+- Advisory Lock 和 Event Store 使用不同连接池；
+- Event Store Pool 大小为 1 时，持锁期间仍能完成完整同步。
 
 ## 5. 原子事务不变量
 
@@ -98,6 +101,7 @@ apps/worker/src/postgres-advisory-lock.integration.test.ts
 6. `provider_sync_checkpoints`。
 
 只有全部成功才 `COMMIT`。任一步失败必须 `ROLLBACK`。
+同步编排器只有在 `commitPage()` 成功返回后，才增加累计页数、累计事件数和 Warning 数量。
 
 禁止：
 
@@ -130,6 +134,8 @@ polymarket:events-keyset:v1:{固定查询条件}
 ```
 
 锁是 PostgreSQL Session 级锁。获得锁的连接必须保持到同步结束，并在 `finally` 中释放。
+锁连接来自独立的单连接 Pool，不能从 Event Store 的业务 Pool 借用。业务 Pool 可以配置为 1，
+仍必须能在持锁期间获得自己的数据库连接并完成同步。
 
 如果另一个实例已持锁，Worker 记录：
 
@@ -214,6 +220,8 @@ pnpm verify
 - 是否在锁获得后过早释放 PoolClient；
 - 锁名是否与 Query Signature 一致；
 - `finally` 是否始终释放。
+- 锁是否错误复用了 Event Store Pool；
+- 单连接 Store 完整同步测试是否被跳过或超时。
 
 ## 11. 外部求助资料
 
@@ -232,7 +240,7 @@ pnpm verify
 
 ## 12. 当前验收结果
 
-PR #4 的 PostgreSQL CI 已验证：
+PR #4 与 PR #5 的 PostgreSQL CI 已验证：
 
 - Schema 与正式迁移同步；
 - 初始迁移执行成功；
@@ -241,7 +249,10 @@ PR #4 的 PostgreSQL CI 已验证：
 - Cursor 可恢复；
 - 重复页面幂等；
 - 故障整页回滚；
-- 多实例 Advisory Lock 互斥和释放；
+- 失败页不污染 Checkpoint 累计计数；
+- 多实例 Advisory Lock 互斥、释放和连接池隔离；
+- Store Pool 大小为 1 时完整同步不自阻塞；
+- `pnpm-lock.yaml` 冻结依赖安装；
 - 自动测试通过；
 - TypeScript 类型检查通过；
 - 生产构建通过。
