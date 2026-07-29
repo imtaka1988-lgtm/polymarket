@@ -188,7 +188,7 @@ Worker 定时触发
 
 ## 8. 当前已完成
 
-以 `main` 最新合并状态为准。PR #4、PR #5、PR #6、PR #7、PR #8、PR #9 与 PR #10 合并后包括：
+以 `main` 最新合并状态为准。PR #4、PR #5、PR #6、PR #7、PR #8、PR #9、PR #10 与 PR #11 合并后包括：
 
 - Monorepo、Web/API/Worker 边界；
 - 核心领域和数据库 Schema；

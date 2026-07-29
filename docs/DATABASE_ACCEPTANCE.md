@@ -348,7 +348,7 @@ CI 还会绕过 Turbo，分别直接执行 Worker 和 API 的 `test:integration`
 
 ## 12. 当前验收结果
 
-PR #4、PR #5、PR #7、PR #8、PR #10 以及本轮读路径加固的 PostgreSQL CI 验收包括：
+PR #4、PR #5、PR #7、PR #8、PR #10 与 PR #11 的 PostgreSQL CI 验收包括：
 
 - Schema 与正式迁移同步；
 - 初始迁移执行成功；
