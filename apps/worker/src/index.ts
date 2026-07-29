@@ -56,8 +56,16 @@ async function syncOnce(): Promise<void> {
   }
 }
 
-function log(level: 'info' | 'warn' | 'error', event: string, details: Record<string, unknown>): void {
-  console.log(JSON.stringify({ level, event, provider: 'polymarket', ...details, timestamp: new Date().toISOString() }));
+function log(level: 'info' | 'warn' | 'error', event: string, details: object): void {
+  console.log(
+    JSON.stringify({
+      level,
+      event,
+      provider: 'polymarket',
+      ...details,
+      timestamp: new Date().toISOString(),
+    }),
+  );
 }
 
 async function shutdown(signal: string): Promise<void> {
