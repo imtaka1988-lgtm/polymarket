@@ -1,6 +1,6 @@
 # 零基础搭建与验收手册
 
-> 文档版本：V0.4
+> 文档版本：V0.5
 > 适用系统：Windows 10/11  
 > 假设：你不懂编程。技术正确性由 AI/工程师和 GitHub Actions 验收，项目负责人不需要手工判断数据库事务或代码逻辑。
 
@@ -116,6 +116,10 @@ POLYMARKET_SYNC_ORDER=updatedAt,id
 POLYMARKET_REALTIME_ENABLED=true
 POLYMARKET_REST_RECONCILIATION_INTERVAL_MS=60000
 POLYMARKET_WEBSOCKET_MAX_QUEUE_SIZE=10000
+POLYMARKET_LIFECYCLE_ENABLED=true
+POLYMARKET_LIFECYCLE_INTERVAL_MS=300000
+POLYMARKET_PRICE_STALE_THRESHOLD_MS=300000
+POLYMARKET_FAILURE_ALERT_THRESHOLD=3
 ```
 
 初次不要随意改大页数或缩短同步间隔。
@@ -181,6 +185,7 @@ pnpm db:migrate
 → 验证锁连接池与业务连接池隔离，单连接 Store 不自阻塞
 → 验证失败页不进入 Checkpoint 累计计数
 → 验证 REST/WebSocket 价格快照幂等、未知 Token 拒绝和乱序保护
+→ 验证生命周期证据幂等、关闭不自动结算、告警打开和恢复
 → 严格类型检查
 → 生产构建
 ```
@@ -226,6 +231,7 @@ provider_sync_page_committed
 provider_sync_completed
 market_realtime_started
 market_price_reconciled
+market_lifecycle_check_completed
 ```
 
 若另一个 Worker 已持有同一同步锁，可能看到：
@@ -269,8 +275,20 @@ Advisory Lock 的 Leader 才会连接行情和写入数据。
 1. 不需要创建 CLOB API Key、钱包或 User Channel 凭据；
 2. 页面读取未来版本化 API，不要直接连接 Polymarket，也不要直接查询 Provider 原始表；
 3. Gamma 价格只作为目录参考，正式展示价格来自 current read model；
-4. 价格可用于只读展示，但在 M1.4 新鲜度/降级状态和版本化 API 完成前不得承诺持续实时；
+4. 新鲜度和降级状态已在数据库中持续计算；页面必须通过下一阶段版本化 API 读取；
 5. 价格不能单独作为结算证据，结算仍需独立检测、复核和审计流程。
+
+### 生命周期和降级状态
+
+Worker 会回查近期到期、关闭和待解析市场，并使用以下表保存事实：
+
+- `market_lifecycle_observations`：不可变官方状态证据；
+- `market_resolution_candidates`：默认等待人工复核的候选；
+- `provider_runtime_states`：各组件最后成功、失败和健康状态；
+- `provider_alerts`：打开和恢复的告警。
+
+`closed` 不会自动变成 `resolved`，也不会自动发放积分。即使候选携带赢家 Outcome，
+仍需后续管理复核和正式 Settlement 流程。项目负责人不要直接修改 Candidate、Outcome 或账本。
 
 ## 16. 健康检查
 

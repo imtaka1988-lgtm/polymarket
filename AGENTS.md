@@ -68,9 +68,9 @@ AI/工程师应负责：
 
 - `apps/web`：Next.js 前端；
 - `apps/api`：NestJS API；
-- `apps/worker`：Provider 同步、CLOB 实时行情、REST 校准、结算与异步任务；
+- `apps/worker`：Provider 同步、CLOB 实时行情、REST 校准、生命周期回查、运行告警、结算与异步任务；
 - `packages/domain`：统一领域模型；
-- `packages/database`：PostgreSQL/Drizzle Schema、价格快照/current read model 和正式迁移；
+- `packages/database`：PostgreSQL/Drizzle Schema、价格/生命周期证据、Provider 运行状态和正式迁移；
 - `packages/provider-polymarket`：Polymarket Gamma/CLOB 客户端、Token Registry、WebSocket 生命周期、解析、标准化和同步编排；
 - `docs/`：项目事实、施工、排错和外援资料。
 

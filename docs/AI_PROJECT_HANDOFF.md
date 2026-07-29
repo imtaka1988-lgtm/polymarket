@@ -137,7 +137,8 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 - 不可变价格快照和 current price read model；
 - 乱序保护和实时 Leader Lock。
 
-下一步增加关闭/结算回查、degraded 状态、可观测告警、Outbox、通知和数据保留。
+生命周期回查、degraded 状态和耐久告警后端已经完成。下一步先提供版本化只读 API；
+Outbox、外部通知和数据保留策略留在后续运营阶段。
 
 ### `packages/provider-polymarket`
 
@@ -215,6 +216,11 @@ Worker 定时触发
 - 来源事件幂等、逐字段乱序保护和十进制定点 midpoint；
 - 实时 Worker Leader Lock 和有界串行消息队列；
 - 正式价格迁移与 PostgreSQL 集成测试；
+- Market 生命周期滚动回查、独立 Leader Lock 和官方契约解析；
+- 不可变 Lifecycle Observation 与待人工复核 Resolution Candidate；
+- 耐久 Provider Runtime State 和可恢复 Alert；
+- 价格新鲜度、连续失败、断线、解析 Warning 和队列积压监控；
+- 正式运营迁移与 PostgreSQL 恢复测试；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md` 和完整外援文档。
 
@@ -222,11 +228,9 @@ Worker 定时触发
 
 ## 9. 当前未完成
 
-### M1.4 回查和运营
+### 前端开工前剩余
 
-- 关闭与结算滚动回查；
-- degraded/只读模式；
-- 同步、新鲜度、断线和队列告警；
+- 版本化只读市场/价格/平台状态 API；
 - 真实网络长期恢复演练；
 - 管理后台；
 - 用户端只读市场列表和详情。
@@ -248,8 +252,9 @@ Worker 定时触发
 - M1.2 数据库迁移与自动验收：完成；
 - M1.3a CLOB WebSocket 客户端基础：完成；
 - M1.3b Token Source、REST 对账与价格持久化：完成；
-- M1.4 回查、降级与可观测性：下一阶段；
-- M1.5 后台和只读页面：待开始；
+- M1.4 回查、降级与可观测性后端：完成；
+- M1.5 版本化只读 API：下一阶段；
+- M1.6 后台和只读页面：待开始；
 - M2 模拟预测闭环：未开始。
 
 精确进度以 Issue #2 和 `docs/CURRENT_STATE.md` 为准。

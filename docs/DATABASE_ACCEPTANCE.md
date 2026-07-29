@@ -1,6 +1,6 @@
 # 数据库迁移与自动验收规范
 
-> 文档版本：V1.1
+> 文档版本：V1.2
 > 最后更新：2026-07-29  
 > 适用阶段：M1.2 及以后所有数据库改动  
 > 状态：已由 GitHub Actions 验证
@@ -26,9 +26,11 @@
 packages/database/drizzle/
 ├── 0000_initial_platform.sql
 ├── 0001_silly_siren.sql
+├── 0002_harsh_dark_beast.sql
 └── meta/
     ├── 0000_snapshot.json
     ├── 0001_snapshot.json
+    ├── 0002_snapshot.json
     └── _journal.json
 ```
 
@@ -72,6 +74,7 @@ CI 顺序：
 apps/worker/src/postgres-events-sync-store.integration.test.ts
 apps/worker/src/postgres-advisory-lock.integration.test.ts
 apps/worker/src/postgres-market-price-store.integration.test.ts
+apps/worker/src/postgres-provider-operations-store.integration.test.ts
 ```
 
 ### Store 集成测试验证
@@ -100,6 +103,18 @@ apps/worker/src/postgres-market-price-store.integration.test.ts
 - 新事件只更新自身携带的价格字段，不会清空其他字段；
 - 乱序旧事件保留不可变历史证据，但不会回退 current 价格或字段时间；
 - 快照和 `market_current_prices` 在同一个事务中提交。
+
+### Provider Operations Store 集成测试验证
+
+- 生命周期 Observation 按来源事件键幂等；
+- `closed` 只更新本地关闭状态，不设置 `resolved_at` 或 Outcome 赢家；
+- Resolution Candidate 默认进入 `pending_review`；
+- 确定性 Token 证据可匹配候选 Outcome，但不触发 Settlement 或 Ledger；
+- 最近已回查市场不会立即重复占用批次；
+- 连续失败达到阈值后打开告警，成功恢复后清零并标记告警 resolved；
+- 目录解析 Warning 告警可以打开和恢复；
+- 缺失/陈旧价格进入 degraded，价格恢复后回到 healthy；
+- 长时间 WebSocket 断线告警可以打开和恢复。
 
 ## 5. 原子事务不变量
 
@@ -173,6 +188,15 @@ polymarket:market-realtime:v1
 只有实时 Leader 执行 REST `/books` 校准、Market WebSocket 订阅和价格持久化。
 它也使用独立单连接 Pool，并通过健康检查确认锁 Session 仍可用；失去 Session 后必须停止
 实时处理并重新竞选，不得让多个实例同时写同一条实时数据流。
+
+生命周期回查使用第三个稳定 Session Lock：
+
+```text
+polymarket:market-lifecycle:v1
+```
+
+回查锁使用独立单连接 Pool，只在一次批次期间持有并在 `finally` 释放。未获得锁的 Worker
+不得启动重复 Gamma 回查，但可以继续提供其他健康检查。
 
 ## 8. 本地命令
 
@@ -260,6 +284,18 @@ pnpm verify
 - `market_price_snapshots` 与 `market_current_prices` 是否在同一事务中；
 - 字段级 captured time 条件是否阻止旧事件覆盖新价格；
 - REST `/books` 是否在 WebSocket 启动前完成一次校准。
+
+### 生命周期或告警测试失败
+
+检查：
+
+- `closed` 是否被错误映射为 `resolved`；
+- Candidate 是否错误修改了 `is_winning_outcome`、Settlement 或 Ledger；
+- Observation `source_event_key` 是否稳定；
+- 生命周期查询是否按最后观察时间轮转；
+- Runtime State 恢复时是否清零连续失败；
+- Alert 是否使用稳定 Dedup Key，并以 resolved 保留历史；
+- 价格新鲜度是否只统计本地 `open` Outcome。
 
 ## 11. 外部求助资料
 

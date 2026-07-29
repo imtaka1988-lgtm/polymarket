@@ -1,6 +1,6 @@
 # 系统架构、数据与核心规则
 
-> 文档版本：V0.3  
+> 文档版本：V0.4
 > 最后更新：2026-07-29
 
 ## 1. 架构选择
@@ -75,6 +75,10 @@ Polymarket / Future Providers
 - `provider_markets`：原始 Market。
 - `market_price_snapshots`：REST/WebSocket 不可变价格更新；
 - `market_current_prices`：按 Outcome 的耐久 current price read model。
+- `market_lifecycle_observations`：不可变 Market 状态回查证据；
+- `market_resolution_candidates`：待人工复核的关闭/赢家候选；
+- `provider_runtime_states`：组件健康、连续失败和最后成功/失败；
+- `provider_alerts`：可去重、可恢复且不删除历史的告警。
 
 ### 4.4 运行互斥
 
@@ -122,6 +126,28 @@ PostgreSQL current read model 是前端和未来 Quote 的耐久读取边界；R
 
 决策见 ADR-0004 和 ADR-0005。
 
+### 4.6 生命周期与降级边界
+
+M1.4 使用官方 `GET /markets/{id}` 轮转回查近期到期、已关闭和待解析市场。
+同一市场在最近回查间隔内不会重复占用批次，避免大量已关闭市场饿死新到期市场。
+
+```text
+本地回查候选
+→ Gamma Market 状态
+→ 不可变 Lifecycle Observation
+→ 保守更新本地 open/suspended/closed/archived
+→ closed 时生成 pending_review Resolution Candidate
+```
+
+`closed=true` 不设置 `resolved_at`，不修改 `is_winning_outcome`，不创建 Settlement 或 Ledger。
+只有恰好一个价格为 1、其余为 0 且 Token 匹配时 Candidate 才携带赢家 Outcome。
+
+目录同步、生命周期、行情 REST、WebSocket、价格新鲜度和消息队列分别记录
+`provider_runtime_states`。连续失败、Warning、陈旧价格、长时间断线和事件丢弃写入
+`provider_alerts`；恢复时标记为 `resolved`，不删除历史。
+
+决策见 ADR-0006。
+
 ## 5. 数据库迁移与验收
 
 正式迁移位于：
@@ -135,6 +161,7 @@ Drizzle Schema 位于：
 ```text
 packages/database/src/schema.ts
 packages/database/src/provider-sync-schema.ts
+packages/database/src/provider-operations-schema.ts
 ```
 
 GitHub Actions 每次 PR 和 main Push 自动：
@@ -212,7 +239,8 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 
 `provider_sync_skipped` 可区分进程重入和分布式锁不可用。
 
-后续接入最后成功时间、同步延迟、Cursor 停滞、解析 Warning、连续失败、原始页大小和数据库写入耗时指标。
+当前已持久化最后成功/失败、连续失败、解析 Warning、价格新鲜度、WebSocket 断线、
+重连/消息指标、队列丢弃和恢复状态。版本化只读 API 将聚合这些状态供前端与运维读取。
 
 ## 13. 扩展
 
@@ -240,7 +268,7 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 ## 15. 当前已知架构缺口
 
 - CLOB WebSocket、Token Source、REST 校准和价格写入已实现；
-- 关闭和结算市场的独立滚动回查尚未实现；
 - 真实官方 Fixture 和长期契约监控尚未实现；
 - 管理后台尚不能查看同步运行和 Warning；
-- 数据延迟和连续失败告警尚未实现。
+- 版本化只读 API 尚未实现；
+- 真实网络长期恢复演练尚未在部署环境执行。

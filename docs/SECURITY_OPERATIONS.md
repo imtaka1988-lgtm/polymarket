@@ -26,6 +26,14 @@
 
 监控API延迟错误率、数据库连接慢查询、Worker心跳、Provider同步延迟、WebSocket断线、Outbox积压、结算失败、账本不平、管理员高风险操作、备份结果和云成本。
 
+M1 Provider 基线已将目录同步、生命周期、REST 校准、WebSocket、价格新鲜度和实时队列拆成独立
+`provider_runtime_states`。连续失败、解析 Warning、陈旧价格、长时间断线和消息丢失写入
+`provider_alerts`，恢复时标记 resolved 并保留历史。未来外部告警渠道必须从这些耐久状态转发，
+不能只依赖单个 Worker 进程内存。
+
+Provider degraded 时，未来 API 必须保留最后成功数据并返回 `readOnly=true`、状态原因和数据时间，
+不得在请求链路中临时调用外部 Provider，也不得用空数据覆盖最后成功结果。
+
 ## 7. 事故等级
 
 - SEV-1：数据损坏、账本错误、大范围不可用

@@ -77,3 +77,63 @@ test('normalizer safely parses string-encoded outcome fields', () => {
   assert.equal(market.outcomes[0]?.indicativePrice, 0.63);
   assert.equal(event.warnings.length, 0);
 });
+
+test('getMarketLifecycle parses official status fields and only detects a deterministic winner', async () => {
+  const requestedUrls: string[] = [];
+  const client = new PolymarketClient({
+    gammaBaseUrl: 'https://gamma-api.polymarket.com',
+    timeoutMs: 1_000,
+    fetchFn: async (input) => {
+      requestedUrls.push(String(input));
+      return new Response(
+        JSON.stringify({
+          id: 'market/with space',
+          question: 'Did the event happen?',
+          outcomes: '["Yes","No"]',
+          outcomePrices: '["1","0"]',
+          clobTokenIds: '["token-yes","token-no"]',
+          active: false,
+          closed: true,
+          archived: false,
+          acceptingOrders: false,
+          closedTime: '2026-07-29T13:00:00Z',
+          updatedAt: '2026-07-29T13:01:00Z',
+          umaResolutionStatus: 'resolved',
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  const snapshot = await client.getMarketLifecycle('market/with space');
+
+  assert.equal(requestedUrls[0], 'https://gamma-api.polymarket.com/markets/market%2Fwith%20space');
+  assert.equal(snapshot.closed, true);
+  assert.equal(snapshot.closedAt, '2026-07-29T13:00:00.000Z');
+  assert.equal(snapshot.winningTokenId, 'token-yes');
+  assert.equal(snapshot.providerResolutionStatus, 'resolved');
+});
+
+test('getMarketLifecycle rejects mismatched outcome evidence instead of guessing a winner', async () => {
+  const client = new PolymarketClient({
+    gammaBaseUrl: 'https://gamma-api.polymarket.com',
+    timeoutMs: 1_000,
+    fetchFn: async () =>
+      new Response(
+        JSON.stringify({
+          id: 'market-1',
+          question: 'Malformed market',
+          outcomes: '["Yes","No"]',
+          outcomePrices: '["1"]',
+          clobTokenIds: '["token-yes","token-no"]',
+          closed: true,
+        }),
+        { status: 200 },
+      ),
+  });
+
+  await assert.rejects(
+    () => client.getMarketLifecycle('market-1'),
+    /outcomePrices length did not match outcomes/,
+  );
+});

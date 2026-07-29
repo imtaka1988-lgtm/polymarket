@@ -82,10 +82,33 @@ export interface PolymarketMarketRaw extends Record<string, unknown> {
   enableOrderBook?: unknown;
   startDate?: unknown;
   endDate?: unknown;
+  closedTime?: unknown;
   updatedAt?: unknown;
+  umaResolutionStatus?: unknown;
   bestBid?: unknown;
   bestAsk?: unknown;
   lastTradePrice?: unknown;
+}
+
+export interface PolymarketMarketLifecycleOutcome {
+  label: string;
+  price: string | null;
+  tokenId: string | null;
+}
+
+export interface PolymarketMarketLifecycleSnapshot {
+  providerMarketId: string;
+  question: string;
+  active: boolean | null;
+  closed: boolean | null;
+  archived: boolean | null;
+  acceptingOrders: boolean | null;
+  closedAt: string | null;
+  sourceUpdatedAt: string | null;
+  providerResolutionStatus: string | null;
+  outcomes: PolymarketMarketLifecycleOutcome[];
+  winningTokenId: string | null;
+  raw: PolymarketMarketRaw;
 }
 
 export interface PolymarketEventRaw extends Record<string, unknown> {

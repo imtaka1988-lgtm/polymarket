@@ -3,6 +3,7 @@ export * from './decimal.js';
 export * from './errors.js';
 export * from './events-keyset-sync.js';
 export * from './market-token-subscription-registry.js';
+export * from './market-lifecycle.js';
 export * from './market-websocket-contract.js';
 export * from './market-websocket.js';
 export * from './normalizer.js';

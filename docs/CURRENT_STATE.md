@@ -2,8 +2,8 @@
 
 > 状态日期：2026-07-29  
 > 项目阶段：M1 Provider 数据闭环  
-> 当前完成：M1.3b CLOB 实时价格数据闭环
-> 下一工作：M1.4 关闭/结算回查、degraded 状态和可观测性
+> 当前完成：M1.4 Provider 生命周期回查、degraded 状态和可观测性后端
+> 下一工作：前端可依赖的版本化只读 API
 > 权威任务：GitHub Issue #2  
 > 状态规则：本文件每次功能 PR 必须更新
 
@@ -65,6 +65,17 @@
 - 实时 Worker Session Advisory Leader Lock；
 - 正式迁移和 PostgreSQL 价格集成测试；
 - ADR-0005。
+- Gamma `GET /markets/{id}` 生命周期契约和严格响应解析；
+- 近期关闭、已关闭和待解析市场的轮转回查；
+- 生命周期独立 Advisory Lock 和多实例互斥；
+- 不可变 `market_lifecycle_observations`；
+- 默认 `pending_review` 的 `market_resolution_candidates`；
+- `closed` 只推进本地关闭状态，不自动标记赢家或结算；
+- `provider_runtime_states` 耐久组件健康状态；
+- `provider_alerts` 告警去重、打开和恢复历史；
+- 目录同步 Warning、连续失败、价格缺失/陈旧、长时间断线和队列丢失告警；
+- 生命周期、告警恢复和新鲜度 PostgreSQL 集成测试；
+- 正式迁移 `0002_harsh_dark_beast.sql` 和 ADR-0006。
 
 ## 3. M1.2 自动验收结果
 
@@ -88,11 +99,9 @@ GitHub Actions 已真实验证：
 
 ## 4. 尚未完成
 
-### M1.4 回查和运营
+### 前端开工前剩余
 
-- 关闭/结算滚动回查；
-- degraded/只读模式；
-- 同步、数据新鲜度、断线、队列和连续失败告警；
+- 版本化只读市场列表、详情、价格和平台数据状态 API；
 - 真实网络长期运行与恢复演练；
 - 同步管理后台；
 - 只读市场列表和详情页面。
@@ -110,22 +119,23 @@ GitHub Actions 已真实验证：
 ## 5. 当前已知风险
 
 - Keyset 推荐排序 `updatedAt,id` 仍需要真实官方长期 Fixture 和契约验证；
-- WebSocket 与 REST 已形成耐久价格闭环，但尚未完成生产级新鲜度告警和长期恢复演练；
+- WebSocket、REST 和耐久告警已形成数据闭环，但真实网络长期恢复演练仍需部署环境；
 - 外部字段可能变化，必须保存原始响应并维护 Fixture；
 - 不能把 `closed` 直接解释为本地已结算；
-- 尚未完成 Provider 运行告警和管理后台；
+- Provider 运行告警已有耐久后端，尚未提供管理页面；
 - 当前不是可公开运营的成品。
 
 ## 6. 完成度口径
 
-M1.3b 实时价格数据闭环完成后的工程评估：
+M1.4 Provider 运营后端完成后的工程评估：
 
 - Event Keyset 目录同步模块：约 96%；
 - M1.2 数据库迁移与持久化可靠性：约 97%；
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
 - M1.3b CLOB 实时价格数据闭环：约 92%；
-- 整个 M1 数据闭环：约 74%；
-- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 17%–20%。
+- M1.4 生命周期与可观测性后端：约 90%；
+- 整个 M1 数据闭环：约 84%；
+- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 20%–23%。
 
 剩余 Event Keyset 优化主要是：真实官方 Fixture、长期契约监控、大数据性能测试和运行告警。
 
@@ -136,4 +146,4 @@ M1.3b 实时价格数据闭环完成后的工程评估：
 3. 读取 `docs/DATABASE_ACCEPTANCE.md`；
 4. 查看 Issue #2；
 5. 检查最新 main Commit、PR 和 GitHub Actions；
-6. 进入 M1.4 关闭/结算回查、降级和可观测性，不要提前制作正式前端页面。
+6. 实现版本化只读 API，不要让前端直接查询 Provider 或数据库内部表。
