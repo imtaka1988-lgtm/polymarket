@@ -1,0 +1,15 @@
+{
+  "name": "@forecast/provider-polymarket",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "node -e \"console.log('provider tests: pending')\""
+  },
+  "dependencies": { "@forecast/domain": "workspace:*" },
+  "devDependencies": { "typescript": "^5.9.3" }
+}
