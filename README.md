@@ -1,10 +1,22 @@
 # Event Forecast Lab
 
 > **项目形态**：可扩展的娱乐型事件预测与游戏化互动平台  
-> **当前阶段**：Provider 数据同步基线 V0.2  
+> **当前阶段**：M1 Provider 数据闭环  
 > **核心边界**：只使用无现金价值、不可购买、不可提现、不可转让的免费虚拟积分。
 
 本项目以 Polymarket 公开市场数据作为首个外部来源。平台不依赖 Polymarket 用户账户、钱包或交易系统；所有模拟预测、积分、持仓与结算由本地系统管理。
+
+## 新聊天、AI 或外部工程师从这里开始
+
+**第一步必须读取根目录 [`AGENTS.md`](AGENTS.md)。**
+
+随后按该文件要求读取：
+
+1. [`docs/AI_PROJECT_HANDOFF.md`](docs/AI_PROJECT_HANDOFF.md)
+2. [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)
+3. 当前 GitHub Issues、最近合并 PR 和 CI 状态
+
+不要依赖旧聊天记忆直接修改代码。仓库 `main`、已合并 PR、打开的 Issue 和 CI 是事实来源。
 
 ## 当前已具备
 
@@ -19,9 +31,7 @@
 - Doctor、Health、Verify、Support Bundle 与 GitHub Actions CI；
 - 零基础施工、架构、Provider 接入、排错、安全和外部求助文档。
 
-## 第一次开始
-
-按顺序阅读：
+## 项目负责人阅读顺序
 
 1. [`docs/BEGINNER_BUILD_GUIDE.md`](docs/BEGINNER_BUILD_GUIDE.md)
 2. [`docs/PROJECT_MASTER_PLAN.md`](docs/PROJECT_MASTER_PLAN.md)
@@ -70,7 +80,7 @@ pnpm db:migrate
 
 ## 当前不是成品
 
-当前完成了可验证的工程底座和 Event 目录同步基线。尚未完成完整用户系统、模拟预测闭环、管理后台和 CLOB 实时行情。
+当前完成了可验证的工程底座和 Event 目录同步基线。尚未完成完整用户系统、模拟预测闭环、管理后台和 CLOB 实时行情。详细状态以 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) 和 Issue #2 为准。
 
 ## 安全底线
 
