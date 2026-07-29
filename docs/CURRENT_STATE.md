@@ -14,6 +14,7 @@
 - PR #4：正式迁移、PostgreSQL 自动验收、分布式锁和 AI/外援接管文档（本状态随 PR #4 合并生效）。
 - PR #5：同步连接池隔离、失败页计数修复、单连接 Store 验收和冻结依赖基线。
 - PR #6：M1.3a CLOB WebSocket 契约、Token Registry、断线恢复和文档基线（本状态随 PR #6 合并生效）。
+- PR #7：M1.3b CLOB REST/WebSocket 价格闭环、耐久 current read model 和实时 Leader Lock（本状态随 PR #7 合并生效）。
 
 ## 2. 当前已经具备
 
