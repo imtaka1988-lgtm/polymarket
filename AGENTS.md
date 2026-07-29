@@ -11,11 +11,12 @@
 3. `docs/PROJECT_MASTER_PLAN.md`
 4. `docs/ARCHITECTURE_AND_DATA.md`
 5. `docs/POLYMARKET_DATA_INTEGRATION.md`
-6. `docs/DEVELOPMENT_WORKFLOW.md`
-7. `docs/TROUBLESHOOTING_AND_SUPPORT.md`
-8. `docs/ROADMAP_CAPABILITY_MATRIX.md`
-9. `docs/adr/` 中全部已接受 ADR
-10. GitHub 当前打开的 Issues、最近合并的 PR 和 CI 状态
+6. `docs/DATABASE_ACCEPTANCE.md`
+7. `docs/DEVELOPMENT_WORKFLOW.md`
+8. `docs/TROUBLESHOOTING_AND_SUPPORT.md`
+9. `docs/ROADMAP_CAPABILITY_MATRIX.md`
+10. `docs/adr/` 中全部已接受 ADR
+11. GitHub 当前打开的 Issues、最近合并的 PR 和 CI 状态
 
 读取完成后，先用不超过十条说明：当前阶段、已完成能力、未完成能力、正在处理的 Issue、主要风险和下一步。不要在未读取仓库前根据旧聊天直接开发。
 
@@ -55,11 +56,13 @@ AI/工程师应负责：
 3. 文档未更新，功能视为未完成。
 4. 未通过 `pnpm test`、`pnpm typecheck` 和 `pnpm build` 不得合并。
 5. 涉及数据库的功能必须有迁移和 PostgreSQL 集成测试。
-6. 外部 API 原始字段只能出现在 Provider Adapter 和原始数据层。
-7. Cursor 推进必须和页面数据写入处于同一数据库事务。
-8. 账本历史不得删除；错误通过冲正处理。
-9. 不提交 `.env`、Token、Cookie、密码、私钥、生产数据或未脱敏日志。
-10. 不以“页面能打开”代替可靠性、回滚和故障恢复验收。
+6. CI 必须检查 Schema 与已提交迁移无漂移，并真实执行迁移。
+7. 外部 API 原始字段只能出现在 Provider Adapter 和原始数据层。
+8. Cursor 推进必须和页面数据写入处于同一数据库事务。
+9. 同一 Query Signature 的多实例任务必须有分布式互斥。
+10. 账本历史不得删除；错误通过冲正处理。
+11. 不提交 `.env`、Token、Cookie、密码、私钥、生产数据或未脱敏日志。
+12. 不以“页面能打开”代替可靠性、回滚和故障恢复验收。
 
 ## 5. 当前技术结构
 
@@ -67,7 +70,7 @@ AI/工程师应负责：
 - `apps/api`：NestJS API；
 - `apps/worker`：Provider 同步、未来结算与异步任务；
 - `packages/domain`：统一领域模型；
-- `packages/database`：PostgreSQL/Drizzle 模型；
+- `packages/database`：PostgreSQL/Drizzle Schema 和正式迁移；
 - `packages/provider-polymarket`：Polymarket 客户端、解析、标准化和同步编排；
 - `docs/`：项目事实、施工、排错和外援资料。
 
@@ -81,7 +84,7 @@ pnpm build
 pnpm verify
 ```
 
-数据库改动还必须通过 PostgreSQL 服务中的迁移和集成测试。
+数据库改动还必须通过 PostgreSQL 服务中的迁移、漂移检查和集成测试。
 
 ## 7. 每次任务结束前
 
