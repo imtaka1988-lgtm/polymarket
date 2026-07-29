@@ -1,6 +1,6 @@
 # 零基础搭建与验收手册
 
-> 文档版本：V0.6
+> 文档版本：V0.7
 > 适用系统：Windows 10/11  
 > 假设：你不懂编程。技术正确性由 AI/工程师和 GitHub Actions 验收，项目负责人不需要手工判断数据库事务或代码逻辑。
 
@@ -124,6 +124,16 @@ POLYMARKET_FAILURE_ALERT_THRESHOLD=3
 
 初次不要随意改大页数或缩短同步间隔。
 
+API 默认可靠性配置：
+
+```dotenv
+API_DATABASE_POOL_MAX=10
+API_DATABASE_STATEMENT_TIMEOUT_MS=5000
+API_SLOW_REQUEST_THRESHOLD_MS=1000
+```
+
+初次搭建不需要调大连接池或查询超时；先让 CI 和 staging 证据证明容量不足。
+
 ## 8. 安装依赖
 
 ```powershell
@@ -186,6 +196,8 @@ pnpm db:migrate
 → 验证失败页不进入 Checkpoint 累计计数
 → 验证 REST/WebSocket 价格快照幂等、未知 Token 拒绝和乱序保护
 → 验证生命周期证据幂等、关闭不自动结算、告警打开和恢复
+→ 验证公开市场复合索引、2 万行查询计划和 Keyset 分页
+→ 验证 API liveness/readiness、查询超时配置和请求耗时日志
 → 严格类型检查
 → 生产构建
 ```
@@ -223,6 +235,7 @@ pnpm dev
 
 - http://localhost:3000
 - http://localhost:4000/api/v1/health
+- http://localhost:4000/api/v1/health/ready
 - http://localhost:4000/api/v1/markets
 - http://localhost:4000/api/v1/platform/data-status
 
@@ -244,6 +257,9 @@ reason=distributed_lock_unavailable
 ```
 
 这不是数据错误，表示另一个实例正在安全执行同步。
+
+部署平台时使用 `/api/v1/health/ready` 判断实例能否接收流量；`/api/v1/health/live` 只判断进程是否
+存活。页面仍只调用 `/api/v1/markets`、详情、价格和 data-status，不把 health 接口当作业务数据。
 
 ## 15. Provider 同步数据
 

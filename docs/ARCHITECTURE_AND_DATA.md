@@ -1,7 +1,7 @@
 # 系统架构、数据与核心规则
 
-> 文档版本：V0.5
-> 最后更新：2026-07-29
+> 文档版本：V0.6
+> 最后更新：2026-07-30
 
 ## 1. 架构选择
 
@@ -254,10 +254,18 @@ Next.js
 ```
 
 市场列表使用 `(updated_at DESC, id DESC)` Keyset Cursor；详情和价格应用相同公开状态白名单。
+默认公开列表使用 `markets_public_feed_idx(status, updated_at DESC, id DESC)`；查询参数以
+`market_status[]` 比较，避免把 enum 转成 text 导致索引失效。CI 会在 2 万行验收数据上检查
+实际执行计划和跨页不重不漏。
+
 价格保留 PostgreSQL numeric 的十进制字符串。Provider 健康从 `provider_runtime_states` 和
 `provider_alerts` 聚合为 healthy/degraded/unavailable，非 healthy 时 `readOnly=true`。
 原始 payload、内部错误与告警详情不得进入公开 DTO。完整契约见 `docs/API_READ_CONTRACT.md`
 和 ADR-0007。
+
+API 数据库连接配置单条 statement timeout，避免异常查询长期占用连接池。`/health/live` 只检查
+进程，`/health/ready` 真实查询 PostgreSQL；旧 `/health` 保持兼容。每个请求完成后输出带 Request ID、
+HTTP 状态和耗时的结构化日志，慢请求与 5xx 升级为 warning，且不记录查询字符串。
 
 ## 14. 扩展
 
@@ -287,5 +295,6 @@ Next.js
 - CLOB WebSocket、Token Source、REST 校准和价格写入已实现；
 - 真实官方 Fixture 和长期契约监控尚未实现；
 - 管理后台尚不能查看同步运行和 Warning；
-- 版本化只读 API 已实现，生产只读数据库角色、缓存和速率限制仍待部署阶段配置；
+- 版本化只读 API、查询索引、statement timeout、健康检查分层和耗时日志已实现；
+- 生产只读数据库角色、缓存和速率限制仍待部署阶段配置；
 - 真实网络长期恢复演练尚未在部署环境执行。

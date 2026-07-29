@@ -1,0 +1,1 @@
+CREATE INDEX "markets_public_feed_idx" ON "markets" USING btree ("status","updated_at" DESC NULLS LAST,"id" DESC NULLS LAST);

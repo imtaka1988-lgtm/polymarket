@@ -1,7 +1,7 @@
 # AI / 外部工程师项目接管说明
 
-> 文档版本：V1.2
-> 最后更新：2026-07-29  
+> 文档版本：V1.3
+> 最后更新：2026-07-30
 > 权威入口：根目录 `AGENTS.md`  
 > 适用对象：新聊天窗口、ChatGPT Work、Codex、外部工程师、后续维护者
 
@@ -141,6 +141,8 @@ Request ID 和错误契约。API 只读本地 PostgreSQL，不在请求链路调
 
 生命周期回查、degraded 状态、耐久告警和版本化只读 API 已经完成。下一步是管理后台与只读页面；
 Outbox、外部通知和数据保留策略留在后续运营阶段。
+M1.5 读路径同时具备公开市场复合索引与正式迁移、2 万行查询计划和 Keyset 验收、
+PostgreSQL statement timeout、liveness/readiness 分层，以及不记录查询字符串的结构化请求耗时日志。
 
 ### `packages/provider-polymarket`
 
@@ -227,6 +229,8 @@ Worker 定时触发
 - 稳定 Keyset Cursor、十进制价格、Request ID 和错误代码；
 - API 公开状态白名单、内部告警字段隔离和 PostgreSQL HTTP 集成测试；
 - required database test fail-closed、Turbo 环境透传和 direct integration CI Step；
+- 公开市场复合索引、正式迁移 0003 和大数据查询计划验收；
+- API statement timeout、liveness/readiness 和结构化耗时日志；
 - `docs/API_READ_CONTRACT.md` 和 ADR-0007；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md` 和完整外援文档。
@@ -259,7 +263,7 @@ Worker 定时触发
 - M1.3a CLOB WebSocket 客户端基础：完成；
 - M1.3b Token Source、REST 对账与价格持久化：完成；
 - M1.4 回查、降级与可观测性后端：完成；
-- M1.5 版本化只读 API：完成；
+- M1.5 版本化只读 API 与读路径可靠性：完成；
 - M1.6 后台和只读页面：下一阶段；
 - M2 模拟预测闭环：未开始。
 

@@ -41,7 +41,7 @@ export class MarketReadStore {
            pm.provider_market_id
          FROM markets m
          LEFT JOIN provider_markets pm ON pm.id = m.provider_market_id
-         WHERE m.status::text = ANY($1::text[])
+         WHERE m.status = ANY($1::market_status[])
            AND (
              $2::timestamptz IS NULL
              OR (m.updated_at, m.id) < ($2::timestamptz, $3::uuid)
@@ -92,7 +92,7 @@ export class MarketReadStore {
     const result = await this.pool.query<MarketRow>(
       `${MARKET_DETAIL_SELECT}
        WHERE m.id = $1
-         AND m.status::text = ANY($2::text[])
+         AND m.status = ANY($2::market_status[])
        ORDER BY mo.sort_order ASC`,
       [id, PUBLIC_STATUS_VALUES],
     );

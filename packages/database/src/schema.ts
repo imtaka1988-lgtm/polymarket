@@ -118,6 +118,7 @@ export const markets = pgTable(
   },
   (table) => [
     index('markets_status_closes_idx').on(table.status, table.closesAt),
+    index('markets_public_feed_idx').on(table.status, table.updatedAt.desc(), table.id.desc()),
     index('markets_provider_idx').on(table.providerMarketId),
   ],
 );

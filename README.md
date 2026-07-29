@@ -2,7 +2,7 @@
 
 > **项目形态**：可扩展的娱乐型事件预测与游戏化互动平台  
 > **当前阶段**：M1 Provider 数据闭环  
-> **已完成阶段**：M1.5 版本化只读市场、价格和平台数据状态 API
+> **已完成阶段**：M1.5 版本化只读 API 与读路径可靠性
 > **下一阶段**：M1.6 管理后台与只读页面
 > **核心边界**：只使用无现金价值、不可购买、不可提现、不可转让的免费虚拟积分。
 
@@ -42,6 +42,8 @@
 - V1 市场列表、详情、current price 和平台数据状态 API；
 - 稳定 Keyset Cursor、十进制价格字符串、Request ID 和错误代码；
 - Provider degraded/unavailable 时保留最后成功数据并返回 `readOnly=true`；
+- 公开市场复合索引、2 万行查询计划验收和数据库查询超时；
+- API liveness/readiness 分层与结构化请求耗时日志；
 - GitHub Actions PostgreSQL 16、迁移漂移检查、自动迁移和集成测试；
 - 不可变虚拟积分账本、结算版本、Outbox、审计和功能开关基线；
 - Doctor、Health、Verify、Support Bundle；
@@ -78,6 +80,7 @@ pnpm dev
 
 - Web：http://localhost:3000
 - API：http://localhost:4000/api/v1/health
+- API readiness：http://localhost:4000/api/v1/health/ready
 - 市场 API：http://localhost:4000/api/v1/markets
 - 数据状态：http://localhost:4000/api/v1/platform/data-status
 - PostgreSQL：localhost:5432

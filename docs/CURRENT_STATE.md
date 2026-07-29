@@ -1,8 +1,8 @@
 # 当前项目状态快照
 
-> 状态日期：2026-07-29  
+> 状态日期：2026-07-30
 > 项目阶段：M1 Provider 数据闭环  
-> 当前完成：M1.5 版本化只读市场、价格和平台数据状态 API
+> 当前完成：M1.5 版本化只读 API 及读路径可靠性加固
 > 下一工作：M1.6 管理后台与只读页面；M1.7 部署环境长期恢复演练
 > 权威任务：GitHub Issue #2  
 > 状态规则：本文件每次功能 PR 必须更新
@@ -18,6 +18,7 @@
 - PR #8：M1.4 生命周期回查、degraded 状态、耐久告警和人工复核候选（本状态随 PR #8 合并生效）。
 - PR #9：M1.5 版本化只读市场、价格、平台状态和稳定错误契约（本状态随 PR #9 合并生效）。
 - PR #10：数据库测试环境 fail-closed 和 CI direct integration 防伪绿验收（本状态随 PR #10 合并生效）。
+- 本轮 PR：公开市场复合索引、大数据查询计划验收、API 查询超时、健康检查分层和请求耗时日志。
 
 ## 2. 当前已经具备
 
@@ -87,6 +88,11 @@
 - API PostgreSQL HTTP 集成测试和跨包数据库测试串行隔离；
 - Turbo 数据库环境显式透传、`REQUIRE_TEST_DATABASE` fail-closed 和 CI direct integration Step；
 - `docs/API_READ_CONTRACT.md` 和 ADR-0007。
+- `markets_public_feed_idx(status, updated_at DESC, id DESC)` 与正式迁移 0003；
+- 2 万行 PostgreSQL `EXPLAIN ANALYZE` 和两页 Keyset 不重不漏验收；
+- API 单条 PostgreSQL statement timeout；
+- 兼容 `/health`、独立 `/health/live` 和真实数据库 `/health/ready`；
+- `api_request_completed` 结构化 Request ID、状态和耗时日志，慢请求/5xx 为 warning。
 
 ## 3. M1.2 自动验收结果
 
@@ -134,7 +140,8 @@ GitHub Actions 已真实验证：
 - 外部字段可能变化，必须保存原始响应并维护 Fixture；
 - 不能把 `closed` 直接解释为本地已结算；
 - Provider 运行告警已有耐久后端，尚未提供管理页面；
-- V1 API 已可作为前端数据边界，但尚未配置生产只读数据库角色、缓存和速率限制；
+- V1 API 已可作为前端数据边界并具备索引、查询超时、readiness 和耗时日志，但尚未配置生产只读数据库角色、缓存和速率限制；
+- 当前大数据验收为 2 万行确定性 CI 数据集；百万级容量、连接池容量和真实流量仍需 staging 压测；
 - 当前不是可公开运营的成品。
 
 ## 6. 完成度口径
@@ -146,11 +153,11 @@ M1.5 版本化只读 API 完成后的工程评估：
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
 - M1.3b CLOB 实时价格数据闭环：约 92%；
 - M1.4 生命周期与可观测性后端：约 90%；
-- M1.5 版本化只读 API：约 93%；
-- 整个 M1 数据闭环：约 89%；
+- M1.5 版本化只读 API：约 96%；
+- 整个 M1 数据闭环：约 90%；
 - 整个成熟娱乐平台：仍处于早期基础建设阶段，约 22%–25%。
 
-剩余 Event Keyset 优化主要是：真实官方 Fixture、长期契约监控、大数据性能测试和外部告警转发。
+剩余 Event Keyset 与运行优化主要是：真实官方 Fixture、长期契约监控、staging 容量压测和外部告警转发。
 
 ## 7. 新接手者下一步
 

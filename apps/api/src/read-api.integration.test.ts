@@ -56,6 +56,21 @@ after(async () => {
 integrationTest(
   'serves stable market pagination, detail, prices, errors, and data status',
   async () => {
+    const legacyHealthResponse = await fetch(`${baseUrl}/api/v1/health`);
+    const legacyHealth = await readJson<HealthResponse>(legacyHealthResponse);
+    assert.equal(legacyHealthResponse.status, 200);
+    assert.equal(legacyHealth.status, 'ok');
+
+    const livenessResponse = await fetch(`${baseUrl}/api/v1/health/live`);
+    const liveness = await readJson<HealthResponse>(livenessResponse);
+    assert.equal(livenessResponse.status, 200);
+    assert.equal(liveness.status, 'ok');
+
+    const readinessResponse = await fetch(`${baseUrl}/api/v1/health/ready`);
+    const readiness = await readJson<HealthResponse>(readinessResponse);
+    assert.equal(readinessResponse.status, 200);
+    assert.equal(readiness.status, 'ready');
+
     const firstResponse = await fetch(`${baseUrl}/api/v1/markets?status=all&limit=1`, {
       headers: { 'x-request-id': 'api-contract-test' },
     });
@@ -136,6 +151,66 @@ integrationTest(
     assert.equal(unavailable.data.readOnly, true);
   },
 );
+
+integrationTest('uses the public feed index for large keyset pagination', async () => {
+  const database = requirePool();
+  await database.query(
+    `INSERT INTO markets (
+       kind, status, source_type, original_title, title, updated_at
+     )
+     SELECT
+       'binary',
+       'open',
+       'provider',
+       'Performance market ' || series,
+       'Performance market ' || series,
+       TIMESTAMPTZ '2026-07-01T00:00:00.000Z' + series * INTERVAL '1 millisecond'
+     FROM generate_series(1, 20000) AS series`,
+  );
+  await database.query('ANALYZE markets');
+
+  const plan = await database.query<{ 'QUERY PLAN': unknown }>(
+    `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+     SELECT id, updated_at
+     FROM markets
+     WHERE status = ANY($1::market_status[])
+     ORDER BY updated_at DESC, id DESC
+     LIMIT $2`,
+    [['open'], 101],
+  );
+  assert.match(JSON.stringify(plan.rows[0]?.['QUERY PLAN']), /markets_public_feed_idx/);
+
+  const firstResponse = await fetch(`${baseUrl}/api/v1/markets?status=open&limit=100`);
+  const first = await readJson<MarketListResponse>(firstResponse);
+  assert.equal(firstResponse.status, 200);
+  assert.equal(first.data.length, 100);
+  assert.equal(first.pagination.hasNextPage, true);
+  assert.notEqual(first.pagination.nextCursor, null);
+
+  const secondResponse = await fetch(
+    `${baseUrl}/api/v1/markets?status=open&limit=100&cursor=${encodeURIComponent(
+      first.pagination.nextCursor ?? '',
+    )}`,
+  );
+  const second = await readJson<MarketListResponse>(secondResponse);
+  assert.equal(secondResponse.status, 200);
+  assert.equal(second.data.length, 100);
+  assert.equal(second.pagination.hasNextPage, true);
+
+  const firstIds = new Set(first.data.map((market) => market.id));
+  assert.equal(
+    second.data.some((market) => firstIds.has(market.id)),
+    false,
+  );
+  const combined = [...first.data, ...second.data];
+  assert.deepEqual(
+    combined.map((market) => market.updatedAt),
+    combined
+      .map((market) => market.updatedAt)
+      .toSorted()
+      .reverse(),
+  );
+});
 
 async function resetDatabase(database: Pool): Promise<void> {
   await database.query(`TRUNCATE TABLE
@@ -274,6 +349,7 @@ interface MarketListResponse {
   data: Array<{
     id: string;
     title: string;
+    updatedAt: string;
     outcomes: Array<{ price: { midpoint: string } | null }>;
   }>;
   pagination: {
@@ -281,6 +357,10 @@ interface MarketListResponse {
     nextCursor: string | null;
   };
   meta: { apiVersion: string; requestId: string };
+}
+
+interface HealthResponse {
+  status: string;
 }
 
 interface MarketDetailResponse {

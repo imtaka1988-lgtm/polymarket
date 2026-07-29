@@ -1,7 +1,7 @@
 # 数据库迁移与自动验收规范
 
-> 文档版本：V1.4
-> 最后更新：2026-07-29  
+> 文档版本：V1.5
+> 最后更新：2026-07-30
 > 适用阶段：M1.2 及以后所有数据库改动  
 > 状态：已由 GitHub Actions 验证
 
@@ -27,10 +27,12 @@ packages/database/drizzle/
 ├── 0000_initial_platform.sql
 ├── 0001_silly_siren.sql
 ├── 0002_harsh_dark_beast.sql
+├── 0003_thankful_crusher_hogan.sql
 └── meta/
     ├── 0000_snapshot.json
     ├── 0001_snapshot.json
     ├── 0002_snapshot.json
+    ├── 0003_snapshot.json
     └── _journal.json
 ```
 
@@ -75,6 +77,7 @@ apps/worker/src/postgres-events-sync-store.integration.test.ts
 apps/worker/src/postgres-advisory-lock.integration.test.ts
 apps/worker/src/postgres-market-price-store.integration.test.ts
 apps/worker/src/postgres-provider-operations-store.integration.test.ts
+apps/api/src/read-api.integration.test.ts
 ```
 
 ### Store 集成测试验证
@@ -115,6 +118,15 @@ apps/worker/src/postgres-provider-operations-store.integration.test.ts
 - 目录解析 Warning 告警可以打开和恢复；
 - 缺失/陈旧价格进入 degraded，价格恢复后回到 healthy；
 - 长时间 WebSocket 断线告警可以打开和恢复。
+
+### Read API 集成测试验证
+
+- 兼容 health、liveness 和真实 PostgreSQL readiness；
+- 公开状态、详情、价格、错误和数据状态 HTTP 契约；
+- 2 万行市场数据上两页各 100 条的 Keyset 分页不重不漏且顺序稳定；
+- `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` 命中 `markets_public_feed_idx`；
+- `markets.status` 使用原生 `market_status[]` 比较，不以 text cast 绕开索引；
+- draft 市场和内部告警 message/details 不进入公开响应。
 
 ## 5. 原子事务不变量
 
@@ -308,8 +320,11 @@ CI 还会绕过 Turbo，分别直接执行 Worker 和 API 的 `test:integration`
 
 检查：
 
-- Migration 0000–0002 是否已全部执行；
+- Migration 0000–0003 是否已全部执行；
 - 市场分页是否按 `(updated_at DESC, id DESC)`；
+- `markets_public_feed_idx` 是否存在，状态过滤是否仍使用 `market_status[]`；
+- 大数据计划是否出现 `markets_public_feed_idx`；若回退为顺序扫描，先运行 `ANALYZE markets`
+  并检查查询和索引定义，不要删除计划断言；
 - draft/pending_review 是否被公开状态白名单排除；
 - PostgreSQL `numeric` 是否仍以字符串返回；
 - API 和 Worker 数据库测试是否跨包串行；
@@ -333,7 +348,7 @@ CI 还会绕过 Turbo，分别直接执行 Worker 和 API 的 `test:integration`
 
 ## 12. 当前验收结果
 
-PR #4、PR #5、PR #7 与 PR #8 的 PostgreSQL CI 已验证：
+PR #4、PR #5、PR #7、PR #8、PR #10 以及本轮读路径加固的 PostgreSQL CI 验收包括：
 
 - Schema 与正式迁移同步；
 - 初始迁移执行成功；
@@ -350,3 +365,4 @@ PR #4、PR #5、PR #7 与 PR #8 的 PostgreSQL CI 已验证：
 - 自动测试通过；
 - TypeScript 类型检查通过；
 - 生产构建通过。
+- 公开市场大数据 Keyset 分页命中正式复合索引且跨页不重不漏。

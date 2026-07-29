@@ -1,8 +1,8 @@
 # Polymarket 数据接入与同步规范
 
-> 文档版本：V0.6
+> 文档版本：V0.7
 > 适用代码：`@forecast/provider-polymarket` 0.5.x、`@forecast/worker` 0.5.x
-> 最后更新：2026-07-29  
+> 最后更新：2026-07-30
 > 负责人：项目负责人 + AI/Codex  
 > 状态：Event Keyset、CLOB 实时价格、生命周期回查与耐久降级状态已验证
 
@@ -127,6 +127,7 @@ packages/database/
     ├── 0000_initial_platform.sql
     ├── 0001_silly_siren.sql
     ├── 0002_harsh_dark_beast.sql
+    ├── 0003_thankful_crusher_hogan.sql
     └── meta/
 ```
 
@@ -651,8 +652,8 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
 - M1.3b CLOB 实时价格数据闭环：约 92%；
 - M1.4 生命周期与可观测性后端：约 90%；
-- M1.5 版本化只读 API：约 93%；
-- 整个 M1 数据闭环：约 89%。
+- M1.5 版本化只读 API 与读路径可靠性：约 96%；
+- 整个 M1 数据闭环：约 90%。
 
 版本化只读 API 已完成：
 

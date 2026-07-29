@@ -22,6 +22,13 @@
       "when": 1785341031437,
       "tag": "0002_harsh_dark_beast",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785351959621,
+      "tag": "0003_thankful_crusher_hogan",
+      "breakpoints": true
     }
   ]
 }
