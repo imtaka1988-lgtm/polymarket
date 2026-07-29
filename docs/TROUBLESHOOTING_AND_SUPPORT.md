@@ -90,6 +90,11 @@
 4. 不要手工改 Cursor；
 5. 不要关闭分布式锁绕过问题。
 
+锁连接和 Event Store 连接必须来自两个独立 Pool。`WORKER_DATABASE_POOL_SIZE` 只控制
+Store Pool；即使设置为 1，也不应因为 Advisory Lock 占用连接而永久等待。
+若单实例在获得锁后没有任何页面提交日志，检查 `apps/worker/src/index.ts` 是否错误地把
+Store Pool 传给 `tryAcquirePostgresAdvisoryLock()`。
+
 ### 422：offset is not allowed
 
 Keyset 不能使用 Offset。检查是否调用旧 `listEvents`、人工拼接 URL 或使用过期分支。
@@ -111,6 +116,12 @@ POLYMARKET_SYNC_ORDER=id
 ### Cursor 不前进
 
 系统停止以防死循环。提供 Request Cursor、Response Cursor、原始页 ID、Request URL 和 Run ID。不要手工修改 Cursor。
+
+### 失败后累计页数或事件数异常增加
+
+失败页面不能进入累计计数。检查同步编排器是否在 `commitPage()` 成功前增加
+`pagesProcessed` 或 `eventsProcessed`，并运行 Provider 失败页回归测试。
+不要手工修正 Cursor；先确认最后成功页面和 Checkpoint，再通过正式修复恢复统计。
 
 ### 同一页重复
 

@@ -250,14 +250,17 @@ Worker 使用两层保护。
 
 `pg_try_advisory_lock(hashtextextended(query_signature, 0))` 防止多个 Worker 实例同时推进同一 Cursor。
 
-锁由专用 PoolClient Session 持有，在同步结束或失败后的 `finally` 中释放。另一个实例无法获得锁时记录：
+锁由独立的单连接 PostgreSQL Pool 提供专用 PoolClient Session，并在同步结束或失败后的
+`finally` 中释放。Event Store 使用另一业务连接池；即使
+`WORKER_DATABASE_POOL_SIZE=1`，锁也不会占用 Store 的唯一连接。
+另一个实例无法获得锁时记录：
 
 ```text
 provider_sync_skipped
 reason=distributed_lock_unavailable
 ```
 
-自动集成测试已验证：互斥有效，释放后其他实例可以获得锁。
+自动集成测试已验证：互斥有效、释放后其他实例可以获得锁，并且单连接 Store 可以在锁持有期间完成整页同步。
 
 ## 14. 幂等与原子性
 
@@ -272,6 +275,8 @@ reason=distributed_lock_unavailable
 同一页面重复执行不会增加重复记录。
 
 持久化中途发生 SQL 错误时，Raw Page、Event、Market、Outcome 和 Cursor 全部回滚。该行为已由 PostgreSQL 集成测试验证。
+累计页数、累计事件数和 Warning 数量只在 `commitPage()` 成功后推进；失败页不会污染 Checkpoint 统计，
+后续重试仍从最后一次成功提交的 Cursor 和累计值继续。
 
 ## 15. 日志事件
 
@@ -384,7 +389,8 @@ POLYMARKET_SYNC_ORDER=id
 - Cursor 恢复；
 - 重复页面幂等；
 - SQL 故障回滚；
-- PostgreSQL Advisory Lock 互斥与释放。
+- 失败页不推进累计计数；
+- PostgreSQL Advisory Lock 互斥、释放与单连接 Store 不自阻塞。
 
 仍需补充：
 

@@ -6,6 +6,12 @@ import type { EventsKeysetSyncStore, EventsSyncCheckpoint, EventsSyncPageCommit 
 class MemoryStore implements EventsKeysetSyncStore {
   checkpoint: EventsSyncCheckpoint | null = null;
   commits: EventsSyncPageCommit[] = [];
+  failedRun:
+    | {
+        pagesProcessed: number;
+        eventsProcessed: number;
+      }
+    | null = null;
 
   async loadCheckpoint(): Promise<EventsSyncCheckpoint | null> { return this.checkpoint; }
   async startRun(): Promise<string> { return 'run-1'; }
@@ -20,7 +26,15 @@ class MemoryStore implements EventsKeysetSyncStore {
     };
   }
   async completeRun(): Promise<void> {}
-  async failRun(): Promise<void> {}
+  async failRun(input: {
+    pagesProcessed: number;
+    eventsProcessed: number;
+  }): Promise<void> {
+    this.failedRun = {
+      pagesProcessed: input.pagesProcessed,
+      eventsProcessed: input.eventsProcessed,
+    };
+  }
 }
 
 test('sync persists each page before advancing and stops on final cursor', async () => {
@@ -50,4 +64,33 @@ test('sync persists each page before advancing and stops on final cursor', async
   assert.equal(result.pagesProcessed, 2);
   assert.equal(store.commits.length, 2);
   assert.equal(store.checkpoint?.nextCursor, null);
+});
+
+test('does not count a page that fails before its atomic commit', async () => {
+  const page = {
+    events: [{ id: '1', title: 'One', markets: [] }],
+    nextCursor: 'next',
+    requestCursor: null,
+    requestUrl: 'https://example.test/1',
+    fetchedAt: '2026-07-29T12:00:00.000Z',
+    rawPayload: { events: [] },
+  };
+  const client = {
+    listEventsKeyset: async () => page,
+  };
+  const store = new MemoryStore();
+  store.commitPage = async () => {
+    throw new Error('simulated atomic commit failure');
+  };
+
+  await assert.rejects(
+    () => runEventsKeysetSync(client as never, store, { query: { limit: 1 }, maxPages: 1 }),
+    /simulated atomic commit failure/,
+  );
+
+  assert.deepEqual(store.failedRun, {
+    pagesProcessed: 0,
+    eventsProcessed: 0,
+  });
+  assert.equal(store.checkpoint, null);
 });

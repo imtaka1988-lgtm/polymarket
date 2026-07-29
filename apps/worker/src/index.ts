@@ -17,11 +17,17 @@ const client = new PolymarketClient({
   },
 });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ?? 'postgresql://forecast:forecast@localhost:5432/forecast',
+const databaseConnectionString =
+  process.env.DATABASE_URL ?? 'postgresql://forecast:forecast@localhost:5432/forecast';
+const storePool = new Pool({
+  connectionString: databaseConnectionString,
   max: Number(process.env.WORKER_DATABASE_POOL_SIZE ?? 5),
 });
-const store = new PostgresEventsKeysetSyncStore(pool);
+const lockPool = new Pool({
+  connectionString: databaseConnectionString,
+  max: 1,
+});
+const store = new PostgresEventsKeysetSyncStore(storePool);
 const intervalMs = Number(process.env.POLYMARKET_SYNC_INTERVAL_MS ?? 60_000);
 const pageSize = Number(process.env.POLYMARKET_SYNC_PAGE_SIZE ?? 100);
 const maxPages = Number(process.env.POLYMARKET_SYNC_MAX_PAGES_PER_RUN ?? 5);
@@ -48,7 +54,7 @@ async function syncOnce(): Promise<void> {
   running = true;
   let distributedLock: Awaited<ReturnType<typeof tryAcquirePostgresAdvisoryLock>> = null;
   try {
-    distributedLock = await tryAcquirePostgresAdvisoryLock(pool, syncLockName);
+    distributedLock = await tryAcquirePostgresAdvisoryLock(lockPool, syncLockName);
     if (distributedLock === null) {
       log('warn', 'provider_sync_skipped', {
         reason: 'distributed_lock_unavailable',
@@ -88,7 +94,7 @@ function log(level: 'info' | 'warn' | 'error', event: string, details: object): 
 
 async function shutdown(signal: string): Promise<void> {
   log('info', 'worker_shutdown_started', { signal });
-  await pool.end();
+  await Promise.all([storePool.end(), lockPool.end()]);
   process.exit(0);
 }
 

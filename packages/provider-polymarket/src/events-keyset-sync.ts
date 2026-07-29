@@ -55,23 +55,26 @@ export async function runEventsKeysetSync(
 
       const normalizedEvents = page.events.map(normalizePolymarketEvent);
       const warnings = normalizedEvents.flatMap((event) => event.warnings);
-      pagesThisRun += 1;
-      pagesProcessed += 1;
-      eventsProcessed += page.events.length;
-      warningCount += warnings.length;
+      const committedPages = pagesProcessed + 1;
+      const committedEvents = eventsProcessed + page.events.length;
 
       await store.commitPage({
         provider: 'polymarket',
         resourceType: 'events',
         querySignature,
         runId,
-        pageNumber: pagesProcessed,
+        pageNumber: committedPages,
         page,
         normalizedEvents,
         warnings,
-        cumulativePages: pagesProcessed,
-        cumulativeEvents: eventsProcessed,
+        cumulativePages: committedPages,
+        cumulativeEvents: committedEvents,
       });
+
+      pagesThisRun += 1;
+      pagesProcessed = committedPages;
+      eventsProcessed = committedEvents;
+      warningCount += warnings.length;
 
       options.onProgress?.({
         pageNumber: pagesProcessed,
