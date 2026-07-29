@@ -5,7 +5,9 @@
     "moduleResolution": "Node",
     "declaration": false,
     "outDir": "./dist",
-    "baseUrl": "./"
+    "baseUrl": "./",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*.ts"]
 }
