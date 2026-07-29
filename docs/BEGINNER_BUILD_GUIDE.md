@@ -245,6 +245,19 @@ reason=distributed_lock_unavailable
 
 重复启动后会从数据库 Cursor 继续，不会永远只读第一页。
 
+### CLOB 实时行情当前边界
+
+M1.3a 已完成公开 Market WebSocket 客户端、Token Registry、动态订阅、`PING/PONG`、
+断线重连和完整重订阅的代码与自动测试。当前 Worker 还没有从 PostgreSQL 自动加载 Token，
+也没有把价格写入 `market_price_snapshots`。
+
+因此开始搭建时：
+
+1. 不需要创建 CLOB API Key、钱包或 User Channel 凭据；
+2. 不要把 Gamma 价格或单次 WebSocket 消息直接当作报价真相；
+3. 下一步必须完成 Token Source、REST 初始快照、周期对账和价格持久化；
+4. 在这些步骤完成前，页面不得宣称价格是可用于模拟预测的可靠实时价格。
+
 ## 16. 健康检查
 
 ```powershell

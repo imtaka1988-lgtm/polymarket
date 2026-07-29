@@ -143,7 +143,31 @@ pnpm db:migrate
 
 ### 市场价格不实时
 
-当前 Gamma Keyset 只负责目录和初始参考。CLOB WebSocket 尚未完成，因此这不属于 Event 同步故障。
+Gamma Keyset 只负责目录和 Token ID。CLOB WebSocket 客户端基础已经完成，但 Worker Token Source、
+REST 对账和价格持久化尚未接线，因此当前数据库价格不实时不属于 Event Keyset 故障。
+
+### Market WebSocket 没有建立连接
+
+客户端只有在已启动且 Token Registry 非空时才连接。依次检查：
+
+1. Registry 是否有有效 Token ID；
+2. 地址是否为 `wss://ws-subscriptions-clob.polymarket.com/ws/market`；
+3. 是否把公开 Market Channel 错写成需要凭据的 User Channel；
+4. `connectionAttempts`、当前 state 和 Warning；
+5. 网络是否允许 WSS。
+
+不要为了建立公开行情连接而填写 API Key、Secret、Passphrase 或钱包私钥。
+
+### Market WebSocket 反复断线
+
+检查是否每 10 秒发送文本 `PING`、是否收到 `PONG`、订阅帧是否使用 `assets_ids`，
+以及重连后是否从 Registry 完整重订阅。保留状态变化、重连次数、最后消息时间和脱敏 Warning。
+不要关闭指数退避形成高频重连。
+
+### WebSocket 出现未知或非法消息
+
+Provider Parser 会记录 Warning 并跳过缺少关键标识的消息。保存脱敏 Fixture、事件类型和时间，
+更新契约测试后再扩展解析器；不要把外部 snake_case 原始对象直接传给业务模块。
 
 ### 积分错误
 

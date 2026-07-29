@@ -4,6 +4,8 @@
 - 日期：2026-07-29
 - 决策人：项目负责人 + AI/Codex
 
+> 后续状态：ADR-0004 已落地 CLOB Market WebSocket 客户端基础；REST 对账与价格持久化仍待 M1.3b 完成。
+
 ## 背景
 
 Polymarket 同时提供传统 Offset Event 列表和 Keyset Event 列表。平台需要长期同步持续变化的大量事件，并在中断后恢复。

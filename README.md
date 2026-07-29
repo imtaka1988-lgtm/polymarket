@@ -2,8 +2,8 @@
 
 > **项目形态**：可扩展的娱乐型事件预测与游戏化互动平台  
 > **当前阶段**：M1 Provider 数据闭环  
-> **已完成阶段**：M1.2 数据库迁移与自动验收  
-> **下一阶段**：M1.3 CLOB 实时行情  
+> **已完成阶段**：M1.3a CLOB WebSocket 客户端基础
+> **下一阶段**：M1.3b Token Source、REST 对账与价格持久化
 > **核心边界**：只使用无现金价值、不可购买、不可提现、不可转让的免费虚拟积分。
 
 本项目以 Polymarket 公开市场数据作为首个外部来源。平台不依赖 Polymarket 用户账户、钱包或交易系统；所有模拟预测、积分、持仓与结算由本地系统管理。
@@ -25,14 +25,15 @@
 
 - `apps/web`：Next.js 用户端；
 - `apps/api`：NestJS 业务 API；
-- `apps/worker`：Provider Keyset 同步与未来异步任务；
+- `apps/worker`：Provider Keyset 同步与未来实时行情接线、异步任务；
 - `packages/domain`：统一市场、状态和领域事件；
 - `packages/database`：PostgreSQL/Drizzle Schema 和正式迁移；
-- `packages/provider-polymarket`：Keyset 客户端、重试、解析、标准化和同步编排；
+- `packages/provider-polymarket`：Keyset/CLOB 客户端、Token Registry、WebSocket 生命周期、重试、解析、标准化和同步编排；
 - PostgreSQL Cursor 检查点、同步运行、原始页、原始 Event/Market 和标准 Market/Outcome；
 - 页面数据与 Cursor 原子事务；
 - 重复同步幂等和故障整页回滚；
 - 进程内锁和 PostgreSQL Advisory Lock；
+- CLOB Market WebSocket 动态订阅、心跳、重连、完整重订阅和契约测试；
 - GitHub Actions PostgreSQL 16、迁移漂移检查、自动迁移和集成测试；
 - 不可变虚拟积分账本、结算版本、Outbox、审计和功能开关基线；
 - Doctor、Health、Verify、Support Bundle；
@@ -88,7 +89,9 @@ pnpm db:migrate
 
 ## 当前不是成品
 
-当前完成了工程底座、Event 目录同步和数据库可靠性验收。尚未完成 CLOB 实时行情、完整用户系统、模拟预测闭环和管理后台。详细状态以 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) 和 Issue #2 为准。
+当前完成了工程底座、Event 目录同步、数据库可靠性验收和 CLOB WebSocket 客户端基础。
+尚未完成 Worker Token Source、REST 对账、价格持久化、完整用户系统、模拟预测闭环和管理后台。
+详细状态以 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) 和 Issue #2 为准。
 
 ## 安全底线
 
