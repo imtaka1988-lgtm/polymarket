@@ -1,6 +1,6 @@
 # AI / 外部工程师项目接管说明
 
-> 文档版本：V1.1  
+> 文档版本：V1.2
 > 最后更新：2026-07-29  
 > 权威入口：根目录 `AGENTS.md`  
 > 适用对象：新聊天窗口、ChatGPT Work、Codex、外部工程师、后续维护者
@@ -118,7 +118,9 @@ Next.js 用户端。当前只有工程基线，正式市场列表、详情、账
 
 ### `apps/api`
 
-NestJS API。当前主要有健康检查，未来承载身份、市场查询、报价、预测、账本、结算、排行榜和后台接口。
+NestJS API。当前已提供 V1 市场列表、详情、current price、Provider 数据状态、稳定 Cursor、
+Request ID 和错误契约。API 只读本地 PostgreSQL，不在请求链路调用 Provider。未来承载身份、
+报价、预测、账本、结算、排行榜和后台接口。
 
 ### `apps/worker`
 
@@ -137,7 +139,7 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 - 不可变价格快照和 current price read model；
 - 乱序保护和实时 Leader Lock。
 
-生命周期回查、degraded 状态和耐久告警后端已经完成。下一步先提供版本化只读 API；
+生命周期回查、degraded 状态、耐久告警和版本化只读 API 已经完成。下一步是管理后台与只读页面；
 Outbox、外部通知和数据保留策略留在后续运营阶段。
 
 ### `packages/provider-polymarket`
@@ -184,7 +186,7 @@ Worker 定时触发
 
 ## 8. 当前已完成
 
-以 `main` 最新合并状态为准。PR #4、PR #5、PR #6、PR #7 与 PR #8 合并后包括：
+以 `main` 最新合并状态为准。PR #4、PR #5、PR #6、PR #7、PR #8 与 PR #9 合并后包括：
 
 - Monorepo、Web/API/Worker 边界；
 - 核心领域和数据库 Schema；
@@ -221,6 +223,10 @@ Worker 定时触发
 - 耐久 Provider Runtime State 和可恢复 Alert；
 - 价格新鲜度、连续失败、断线、解析 Warning 和队列积压监控；
 - 正式运营迁移与 PostgreSQL 恢复测试；
+- V1 市场列表、详情、current price 与平台数据状态；
+- 稳定 Keyset Cursor、十进制价格、Request ID 和错误代码；
+- API 公开状态白名单、内部告警字段隔离和 PostgreSQL HTTP 集成测试；
+- `docs/API_READ_CONTRACT.md` 和 ADR-0007；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md` 和完整外援文档。
 
@@ -228,12 +234,11 @@ Worker 定时触发
 
 ## 9. 当前未完成
 
-### 前端开工前剩余
+### 下一施工阶段
 
-- 版本化只读市场/价格/平台状态 API；
-- 真实网络长期恢复演练；
-- 管理后台；
-- 用户端只读市场列表和详情。
+- 管理后台和审核工作台；
+- 用户端只读市场列表和详情；
+- staging 真实网络长期恢复演练。
 
 ### M2 预测闭环
 
@@ -253,8 +258,8 @@ Worker 定时触发
 - M1.3a CLOB WebSocket 客户端基础：完成；
 - M1.3b Token Source、REST 对账与价格持久化：完成；
 - M1.4 回查、降级与可观测性后端：完成；
-- M1.5 版本化只读 API：下一阶段；
-- M1.6 后台和只读页面：待开始；
+- M1.5 版本化只读 API：完成；
+- M1.6 后台和只读页面：下一阶段；
 - M2 模拟预测闭环：未开始。
 
 精确进度以 Issue #2 和 `docs/CURRENT_STATE.md` 为准。
@@ -268,6 +273,7 @@ Worker 定时触发
 - 架构：`docs/ARCHITECTURE_AND_DATA.md`；
 - Polymarket：`docs/POLYMARKET_DATA_INTEGRATION.md`；
 - 数据库：`docs/DATABASE_ACCEPTANCE.md`；
+- API：`docs/API_READ_CONTRACT.md`；
 - 施工：`docs/DEVELOPMENT_WORKFLOW.md`；
 - 零基础：`docs/BEGINNER_BUILD_GUIDE.md`；
 - 排错和外援：`docs/TROUBLESHOOTING_AND_SUPPORT.md`；

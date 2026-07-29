@@ -1,6 +1,6 @@
 # 零基础搭建与验收手册
 
-> 文档版本：V0.5
+> 文档版本：V0.6
 > 适用系统：Windows 10/11  
 > 假设：你不懂编程。技术正确性由 AI/工程师和 GitHub Actions 验收，项目负责人不需要手工判断数据库事务或代码逻辑。
 
@@ -223,6 +223,8 @@ pnpm dev
 
 - http://localhost:3000
 - http://localhost:4000/api/v1/health
+- http://localhost:4000/api/v1/markets
+- http://localhost:4000/api/v1/platform/data-status
 
 Worker 成功日志至少可能包含：
 
@@ -273,9 +275,9 @@ Advisory Lock 的 Leader 才会连接行情和写入数据。
 因此开始搭建时：
 
 1. 不需要创建 CLOB API Key、钱包或 User Channel 凭据；
-2. 页面读取未来版本化 API，不要直接连接 Polymarket，也不要直接查询 Provider 原始表；
+2. 页面读取 `/api/v1` 版本化 API，不要直接连接 Polymarket，也不要直接查询 Provider 原始表；
 3. Gamma 价格只作为目录参考，正式展示价格来自 current read model；
-4. 新鲜度和降级状态已在数据库中持续计算；页面必须通过下一阶段版本化 API 读取；
+4. 新鲜度和降级状态已在数据库中持续计算；页面从 `/api/v1/platform/data-status` 读取；
 5. 价格不能单独作为结算证据，结算仍需独立检测、复核和审计流程。
 
 ### 生命周期和降级状态
@@ -289,6 +291,12 @@ Worker 会回查近期到期、关闭和待解析市场，并使用以下表保�
 
 `closed` 不会自动变成 `resolved`，也不会自动发放积分。即使候选携带赢家 Outcome，
 仍需后续管理复核和正式 Settlement 流程。项目负责人不要直接修改 Candidate、Outcome 或账本。
+
+### 前端读取契约
+
+前端开工前读取 `docs/API_READ_CONTRACT.md`。市场列表使用服务端返回的 `nextCursor`，价格保持字符串，
+`readOnly=true` 时展示最后成功数据并禁用未来写操作。不要解析 Cursor、把价格强制转换成浮点数，
+或把 `closed` 当作已结算。
 
 ## 16. 健康检查
 

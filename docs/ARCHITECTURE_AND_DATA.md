@@ -1,6 +1,6 @@
 # 系统架构、数据与核心规则
 
-> 文档版本：V0.4
+> 文档版本：V0.5
 > 最后更新：2026-07-29
 
 ## 1. 架构选择
@@ -240,9 +240,26 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 `provider_sync_skipped` 可区分进程重入和分布式锁不可用。
 
 当前已持久化最后成功/失败、连续失败、解析 Warning、价格新鲜度、WebSocket 断线、
-重连/消息指标、队列丢弃和恢复状态。版本化只读 API 将聚合这些状态供前端与运维读取。
+重连/消息指标、队列丢弃和恢复状态。版本化只读 API 聚合这些状态供前端与运维读取。
 
-## 13. 扩展
+## 13. 版本化只读 API
+
+`apps/api` 只查询本地 PostgreSQL，不在 HTTP 请求中临时调用 Provider：
+
+```text
+Next.js
+→ GET /api/v1/markets
+→ NestJS 稳定 DTO / Cursor / Error
+→ markets + market_outcomes + market_current_prices
+```
+
+市场列表使用 `(updated_at DESC, id DESC)` Keyset Cursor；详情和价格应用相同公开状态白名单。
+价格保留 PostgreSQL numeric 的十进制字符串。Provider 健康从 `provider_runtime_states` 和
+`provider_alerts` 聚合为 healthy/degraded/unavailable，非 healthy 时 `readOnly=true`。
+原始 payload、内部错误与告警详情不得进入公开 DTO。完整契约见 `docs/API_READ_CONTRACT.md`
+和 ADR-0007。
+
+## 14. 扩展
 
 社交、房间、团队、任务、成就、赛季、用户市场、会员、AI 和 API 通过新增模块。真实支付、托管和真金下注必须独立系统。
 
@@ -261,14 +278,14 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 → 可观测运行记录
 ```
 
-## 14. 微服务拆分触发
+## 15. 微服务拆分触发
 
 仅在 Provider 同步影响 API、结算需独立扩容、通知量大、团队独立或合规隔离时拆分。优先候选：Provider、Realtime、Settlement、Notifications。
 
-## 15. 当前已知架构缺口
+## 16. 当前已知架构缺口
 
 - CLOB WebSocket、Token Source、REST 校准和价格写入已实现；
 - 真实官方 Fixture 和长期契约监控尚未实现；
 - 管理后台尚不能查看同步运行和 Warning；
-- 版本化只读 API 尚未实现；
+- 版本化只读 API 已实现，生产只读数据库角色、缓存和速率限制仍待部署阶段配置；
 - 真实网络长期恢复演练尚未在部署环境执行。

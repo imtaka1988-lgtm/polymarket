@@ -31,8 +31,10 @@ M1 Provider 基线已将目录同步、生命周期、REST 校准、WebSocket、
 `provider_alerts`，恢复时标记 resolved 并保留历史。未来外部告警渠道必须从这些耐久状态转发，
 不能只依赖单个 Worker 进程内存。
 
-Provider degraded 时，未来 API 必须保留最后成功数据并返回 `readOnly=true`、状态原因和数据时间，
-不得在请求链路中临时调用外部 Provider，也不得用空数据覆盖最后成功结果。
+Provider degraded 时，V1 API 保留最后成功数据并返回 `readOnly=true`、公开状态代码和数据时间，
+不得在请求链路中临时调用外部 Provider，也不得用空数据覆盖最后成功结果。公开响应不返回
+`last_error`、告警 message/details 或 Provider 原始 payload。生产 API 数据库角色必须只授予
+公开 read model 所需的 SELECT 权限。
 
 ## 7. 事故等级
 
