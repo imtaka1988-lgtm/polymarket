@@ -174,7 +174,7 @@ integrationTest('uses the public feed index for large keyset pagination', async 
      SELECT id, updated_at
      FROM markets
      WHERE status = ANY($1::market_status[])
-     ORDER BY updated_at DESC, id DESC
+     ORDER BY updated_at DESC NULLS LAST, id DESC NULLS LAST
      LIMIT $2`,
     [['open'], 101],
   );

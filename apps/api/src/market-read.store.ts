@@ -46,7 +46,7 @@ export class MarketReadStore {
              $2::timestamptz IS NULL
              OR (m.updated_at, m.id) < ($2::timestamptz, $3::uuid)
            )
-         ORDER BY m.updated_at DESC, m.id DESC
+         ORDER BY m.updated_at DESC NULLS LAST, m.id DESC NULLS LAST
          LIMIT $4
        )
        SELECT
@@ -67,7 +67,10 @@ export class MarketReadStore {
        FROM page
        LEFT JOIN market_outcomes mo ON mo.market_id = page.id
        LEFT JOIN market_current_prices mcp ON mcp.outcome_id = mo.id
-       ORDER BY page.updated_at DESC, page.id DESC, mo.sort_order ASC`,
+       ORDER BY
+         page.updated_at DESC NULLS LAST,
+         page.id DESC NULLS LAST,
+         mo.sort_order ASC`,
       [input.statuses, input.cursor?.updatedAt ?? null, input.cursor?.id ?? null, input.limit + 1],
     );
     const grouped = groupMarkets(result.rows);

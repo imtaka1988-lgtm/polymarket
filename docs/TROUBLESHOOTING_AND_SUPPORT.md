@@ -53,8 +53,9 @@ V1 API 错误体必须包含稳定 `error.code` 和与响应头一致的 `x-requ
 1. 迁移 `0003_thankful_crusher_hogan.sql` 已执行；
 2. `markets_public_feed_idx` 存在；
 3. 状态查询仍使用 `market_status[]`，没有把 `status` 强转成 text；
-4. `ANALYZE markets` 最近执行；
-5. 前端 `limit` 不超过 100，且使用 Cursor 而不是 Offset。
+4. 排序仍显式使用 `DESC NULLS LAST`，与 Drizzle 索引规格一致；
+5. `ANALYZE markets` 最近执行；
+6. 前端 `limit` 不超过 100，且使用 Cursor 而不是 Offset。
 
 不要通过无限增大 statement timeout 掩盖缺失索引，也不要把完整 URL、Cursor 或数据库错误写进公开日志。
 

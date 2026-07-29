@@ -85,6 +85,8 @@
 - 数据库测试跨 Workspace 包串行，避免 API 与 Worker 验收清理互相污染。
 - Turbo `test` 显式透传数据库验收环境；CI required integration Step 禁止 PostgreSQL 测试静默 SKIP。
 - 市场状态过滤改用原生 `market_status[]`，避免 enum text cast 阻止复合索引。
+- 市场 Keyset 排序显式使用 `NULLS LAST`，与 Drizzle 降序索引规格一致，防止查询计划回退为
+  `Seq Scan + Sort`。
 
 ### Known limitations
 

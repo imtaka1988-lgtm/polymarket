@@ -41,7 +41,8 @@ Provider 原始 payload、内部错误、告警详情、凭据或数据库内部
 
 ## 3. 分页稳定性
 
-市场按 `(updated_at DESC, id DESC)` 排序。Cursor 是不透明的 V1 Base64URL 值，内部保存最后一项的
+市场按 `(updated_at DESC NULLS LAST, id DESC NULLS LAST)` 排序。两列均为 `NOT NULL`，显式
+NULL 顺序用于与正式索引规格完全一致。Cursor 是不透明的 V1 Base64URL 值，内部保存最后一项的
 排序元组。客户端必须原样回传，不能解析、修改或自行生成。
 
 列表响应：

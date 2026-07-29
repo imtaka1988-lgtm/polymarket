@@ -253,7 +253,9 @@ Next.js
 → markets + market_outcomes + market_current_prices
 ```
 
-市场列表使用 `(updated_at DESC, id DESC)` Keyset Cursor；详情和价格应用相同公开状态白名单。
+市场列表使用 `(updated_at DESC NULLS LAST, id DESC NULLS LAST)` Keyset Cursor；两列为
+`NOT NULL`，显式 NULL 顺序用于确保查询排序与 Drizzle 索引规格完全匹配。详情和价格应用相同
+公开状态白名单。
 默认公开列表使用 `markets_public_feed_idx(status, updated_at DESC, id DESC)`；查询参数以
 `market_status[]` 比较，避免把 enum 转成 text 导致索引失效。CI 会在 2 万行验收数据上检查
 实际执行计划和跨页不重不漏。
