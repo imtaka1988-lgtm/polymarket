@@ -17,8 +17,8 @@
 | 数据库自动验收 | 核心工程能力 | PostgreSQL 16、迁移漂移、原子提交、幂等、回滚和锁测试已完成 |
 | Event Keyset 同步 | 核心实现 | 已完成客户端、Cursor、重试、原始页、事务和多实例锁基线 |
 | Market 标准化 | 核心实现 | 已完成 Event 内嵌 Market/Outcome 基线，需真实 Fixture 扩充 |
-| CLOB 实时行情 | 核心实现 | WebSocket 客户端、Registry、动态订阅、心跳、重连和契约测试已完成；Worker Token Source 与持久化待完成 |
-| REST 行情对账 | 核心实现 | 未完成 |
+| CLOB 实时行情 | 核心实现 | WebSocket、数据库 Token Source、动态订阅、Leader Lock、有界队列和价格持久化已完成 |
+| REST 行情对账 | 核心实现 | 批量订单簿、启动快照、周期校准、幂等快照和 current read model 已完成 |
 | 关闭/结算回查 | 核心实现 | 未完成 |
 | 同步管理后台 | 核心实现 | 未完成 |
 | 免费积分账本 | 核心实现 | 数据模型完成，业务未实现 |
@@ -56,12 +56,12 @@
 - M1.1 Event Keyset 目录同步：完成基线；
 - M1.2 正式迁移、PostgreSQL 自动验收和 Advisory Lock：完成；
 - M1.3a CLOB WebSocket、动态订阅和断线恢复：完成客户端基础；
-- M1.3b Worker Token Source、REST 行情快照、周期对账、价格持久化和 current cache：下一阶段；
-- M1.4 关闭/结算滚动回查：待完成；
+- M1.3b Worker Token Source、REST 行情快照、周期对账、价格持久化和 current cache：完成；
+- M1.4 关闭/结算滚动回查、degraded 状态和可观测性：下一阶段；
 - M1.5 同步后台和只读页面：待完成；
 - M1.6 监控、告警和恢复演练：待完成。
 
-当前工程评估：整个 M1 约 62%。
+当前工程评估：整个 M1 约 74%。
 
 ### M2 预测闭环
 

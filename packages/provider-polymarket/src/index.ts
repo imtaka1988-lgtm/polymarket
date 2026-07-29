@@ -1,3 +1,5 @@
+export * from './clob-rest-client.js';
+export * from './decimal.js';
 export * from './errors.js';
 export * from './events-keyset-sync.js';
 export * from './market-token-subscription-registry.js';

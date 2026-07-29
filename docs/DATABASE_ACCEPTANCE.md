@@ -1,6 +1,6 @@
 # 数据库迁移与自动验收规范
 
-> 文档版本：V1.0  
+> 文档版本：V1.1
 > 最后更新：2026-07-29  
 > 适用阶段：M1.2 及以后所有数据库改动  
 > 状态：已由 GitHub Actions 验证
@@ -25,8 +25,10 @@
 ```text
 packages/database/drizzle/
 ├── 0000_initial_platform.sql
+├── 0001_silly_siren.sql
 └── meta/
     ├── 0000_snapshot.json
+    ├── 0001_snapshot.json
     └── _journal.json
 ```
 
@@ -69,6 +71,7 @@ CI 顺序：
 ```text
 apps/worker/src/postgres-events-sync-store.integration.test.ts
 apps/worker/src/postgres-advisory-lock.integration.test.ts
+apps/worker/src/postgres-market-price-store.integration.test.ts
 ```
 
 ### Store 集成测试验证
@@ -88,6 +91,15 @@ apps/worker/src/postgres-advisory-lock.integration.test.ts
 - 第一个会话释放后，第二个会话可以获得锁。
 - Advisory Lock 和 Event Store 使用不同连接池；
 - Event Store Pool 大小为 1 时，持锁期间仍能完成完整同步。
+
+### Market Price Store 集成测试验证
+
+- 只有 `open` 市场且存在 Provider Token ID 的 Outcome 会进入实时订阅；
+- 相同来源事件键重复提交不会产生重复价格快照；
+- 未知 Token 不会创建孤立快照；
+- 新事件只更新自身携带的价格字段，不会清空其他字段；
+- 乱序旧事件保留不可变历史证据，但不会回退 current 价格或字段时间；
+- 快照和 `market_current_prices` 在同一个事务中提交。
 
 ## 5. 原子事务不变量
 
@@ -110,6 +122,10 @@ apps/worker/src/postgres-advisory-lock.integration.test.ts
 - 用手工 SQL 补写缺失 Cursor；
 - 删除原始页掩盖同步错误。
 
+价格写入也必须保持一条事务边界：先按 Provider Token 唯一解析本地
+Market/Outcome，再幂等写入 `market_price_snapshots`，最后按字段来源时间 Upsert
+`market_current_prices`。Token 缺失或映射歧义时不得写入孤立价格。
+
 ## 6. 幂等规则
 
 - Event：`provider + provider_event_id` 唯一；
@@ -117,6 +133,8 @@ apps/worker/src/postgres-advisory-lock.integration.test.ts
 - Outcome：`market_id + sort_order` 唯一；
 - 原始页：SHA-256 `page_key` 唯一；
 - Checkpoint：`provider + resource_type + query_signature` 唯一。
+- Price Snapshot：`source_event_key` 唯一；
+- Current Price：`outcome_id` 唯一。
 
 重复同步允许更新内容，但不能增加重复身份记录。
 
@@ -145,6 +163,16 @@ reason=distributed_lock_unavailable
 ```
 
 它不会启动第二条同步链，也不会修改 Cursor。
+
+实时行情使用第二个稳定 Session Lock：
+
+```text
+polymarket:market-realtime:v1
+```
+
+只有实时 Leader 执行 REST `/books` 校准、Market WebSocket 订阅和价格持久化。
+它也使用独立单连接 Pool，并通过健康检查确认锁 Session 仍可用；失去 Session 后必须停止
+实时处理并重新竞选，不得让多个实例同时写同一条实时数据流。
 
 ## 8. 本地命令
 
@@ -222,6 +250,16 @@ pnpm verify
 - `finally` 是否始终释放。
 - 锁是否错误复用了 Event Store Pool；
 - 单连接 Store 完整同步测试是否被跳过或超时。
+
+### 实时价格测试失败
+
+检查：
+
+- `provider_markets.provider_token_id` 是否唯一映射到本地 Outcome；
+- 事件是否携带官方来源时间和稳定 `source_event_key`；
+- `market_price_snapshots` 与 `market_current_prices` 是否在同一事务中；
+- 字段级 captured time 条件是否阻止旧事件覆盖新价格；
+- REST `/books` 是否在 WebSocket 启动前完成一次校准。
 
 ## 11. 外部求助资料
 

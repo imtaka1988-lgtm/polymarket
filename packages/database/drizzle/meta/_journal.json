@@ -8,6 +8,13 @@
       "when": 1785331486657,
       "tag": "0000_initial_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785338956827,
+      "tag": "0001_silly_siren",
+      "breakpoints": true
     }
   ]
 }

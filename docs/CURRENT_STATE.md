@@ -2,8 +2,8 @@
 
 > 状态日期：2026-07-29  
 > 项目阶段：M1 Provider 数据闭环  
-> 当前完成：M1.3a CLOB WebSocket 客户端基础
-> 下一工作：M1.3b Token Source、REST 对账与价格持久化
+> 当前完成：M1.3b CLOB 实时价格数据闭环
+> 下一工作：M1.4 关闭/结算回查、degraded 状态和可观测性
 > 权威任务：GitHub Issue #2  
 > 状态规则：本文件每次功能 PR 必须更新
 
@@ -14,6 +14,7 @@
 - PR #4：正式迁移、PostgreSQL 自动验收、分布式锁和 AI/外援接管文档（本状态随 PR #4 合并生效）。
 - PR #5：同步连接池隔离、失败页计数修复、单连接 Store 验收和冻结依赖基线。
 - PR #6：M1.3a CLOB WebSocket 契约、Token Registry、断线恢复和文档基线（本状态随 PR #6 合并生效）。
+- PR #7：M1.3b CLOB REST/WebSocket 价格闭环、耐久 current read model 和实时 Leader Lock（本状态随 PR #7 合并生效）。
 
 ## 2. 当前已经具备
 
@@ -52,6 +53,18 @@
 - Order Book、Price Change、Last Trade、Tick Size、Best Bid/Ask、New Market 和 Market Resolved 标准化；
 - WebSocket 生命周期、消息和 Warning 进程内指标；
 - 单元、官方契约 Fixture 和模拟断线测试。
+- CLOB REST `POST /books` 官方契约、批量请求和重试；
+- Worker PostgreSQL Token Source 和动态 Registry 维护；
+- 启动 REST 快照与周期校准；
+- WebSocket 与 REST 统一价格写入；
+- 不可变价格快照和来源事件幂等；
+- `market_current_prices` 持久化 current price read model；
+- bid、ask、midpoint、last trade 独立时间戳和乱序保护；
+- 十进制定点 midpoint 计算；
+- WebSocket 有界串行写入队列；
+- 实时 Worker Session Advisory Leader Lock；
+- 正式迁移和 PostgreSQL 价格集成测试；
+- ADR-0005。
 
 ## 3. M1.2 自动验收结果
 
@@ -75,21 +88,12 @@ GitHub Actions 已真实验证：
 
 ## 4. 尚未完成
 
-### M1.3 实时行情
-
-- Worker 从 PostgreSQL 加载可订阅 Token 并维护 Registry；
-- REST 初始订单簿/价格快照；
-- 定时 REST 对账；
-- 价格快照持久化；
-- current price cache；
-- 延迟、断线、连续失败和积压告警；
-- 真实网络长期运行与恢复演练。
-
 ### M1.4 回查和运营
 
 - 关闭/结算滚动回查；
 - degraded/只读模式；
-- 同步告警；
+- 同步、数据新鲜度、断线、队列和连续失败告警；
+- 真实网络长期运行与恢复演练；
 - 同步管理后台；
 - 只读市场列表和详情页面。
 
@@ -106,8 +110,7 @@ GitHub Actions 已真实验证：
 ## 5. 当前已知风险
 
 - Keyset 推荐排序 `updatedAt,id` 仍需要真实官方长期 Fixture 和契约验证；
-- WebSocket 客户端基础已完成，但尚未接入数据库 Token Source 和价格持久化；
-- 只有 WebSocket 没有 REST 对账会存在断线窗口数据缺口；
+- WebSocket 与 REST 已形成耐久价格闭环，但尚未完成生产级新鲜度告警和长期恢复演练；
 - 外部字段可能变化，必须保存原始响应并维护 Fixture；
 - 不能把 `closed` 直接解释为本地已结算；
 - 尚未完成 Provider 运行告警和管理后台；
@@ -115,13 +118,14 @@ GitHub Actions 已真实验证：
 
 ## 6. 完成度口径
 
-PR #5 可靠性验收和 PR #6 M1.3a WebSocket 基础完成后的工程评估：
+M1.3b 实时价格数据闭环完成后的工程评估：
 
 - Event Keyset 目录同步模块：约 96%；
 - M1.2 数据库迁移与持久化可靠性：约 97%；
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
-- 整个 M1 数据闭环：约 62%；
-- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 14%–17%。
+- M1.3b CLOB 实时价格数据闭环：约 92%；
+- 整个 M1 数据闭环：约 74%；
+- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 17%–20%。
 
 剩余 Event Keyset 优化主要是：真实官方 Fixture、长期契约监控、大数据性能测试和运行告警。
 
@@ -132,4 +136,4 @@ PR #5 可靠性验收和 PR #6 M1.3a WebSocket 基础完成后的工程评估：
 3. 读取 `docs/DATABASE_ACCEPTANCE.md`；
 4. 查看 Issue #2；
 5. 检查最新 main Commit、PR 和 GitHub Actions；
-6. 进入 M1.3b Token Source、REST 对账和价格持久化，不要跳到用户预测或页面装饰。
+6. 进入 M1.4 关闭/结算回查、降级和可观测性，不要提前制作正式前端页面。

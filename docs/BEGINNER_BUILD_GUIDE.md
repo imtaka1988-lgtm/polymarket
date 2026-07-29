@@ -1,6 +1,6 @@
 # 零基础搭建与验收手册
 
-> 文档版本：V0.3  
+> 文档版本：V0.4
 > 适用系统：Windows 10/11  
 > 假设：你不懂编程。技术正确性由 AI/工程师和 GitHub Actions 验收，项目负责人不需要手工判断数据库事务或代码逻辑。
 
@@ -113,6 +113,9 @@ Provider 默认配置：
 POLYMARKET_SYNC_PAGE_SIZE=100
 POLYMARKET_SYNC_MAX_PAGES_PER_RUN=5
 POLYMARKET_SYNC_ORDER=updatedAt,id
+POLYMARKET_REALTIME_ENABLED=true
+POLYMARKET_REST_RECONCILIATION_INTERVAL_MS=60000
+POLYMARKET_WEBSOCKET_MAX_QUEUE_SIZE=10000
 ```
 
 初次不要随意改大页数或缩短同步间隔。
@@ -177,6 +180,7 @@ pnpm db:migrate
 → 验证 Advisory Lock 多实例互斥
 → 验证锁连接池与业务连接池隔离，单连接 Store 不自阻塞
 → 验证失败页不进入 Checkpoint 累计计数
+→ 验证 REST/WebSocket 价格快照幂等、未知 Token 拒绝和乱序保护
 → 严格类型检查
 → 生产构建
 ```
@@ -220,6 +224,8 @@ Worker 成功日志至少可能包含：
 ```text
 provider_sync_page_committed
 provider_sync_completed
+market_realtime_started
+market_price_reconciled
 ```
 
 若另一个 Worker 已持有同一同步锁，可能看到：
@@ -245,18 +251,26 @@ reason=distributed_lock_unavailable
 
 重复启动后会从数据库 Cursor 继续，不会永远只读第一页。
 
-### CLOB 实时行情当前边界
+### CLOB 实时行情
 
-M1.3a 已完成公开 Market WebSocket 客户端、Token Registry、动态订阅、`PING/PONG`、
-断线重连和完整重订阅的代码与自动测试。当前 Worker 还没有从 PostgreSQL 自动加载 Token，
-也没有把价格写入 `market_price_snapshots`。
+M1.3b 已完成公开 Market WebSocket、Token Registry、动态订阅、`PING/PONG`、断线重连、
+完整重订阅、PostgreSQL Token Source、REST `/books` 初始/周期校准和价格持久化。
+
+数据库会同时保存：
+
+- `market_price_snapshots`：不可变、可审计的每次 REST/WebSocket 价格证据；
+- `market_current_prices`：按 Outcome 读取的当前 bid、ask、midpoint、last trade。
+
+旧消息不会回退 current 价格；未知 Token 不会生成孤立记录；多实例只有持有实时
+Advisory Lock 的 Leader 才会连接行情和写入数据。
 
 因此开始搭建时：
 
 1. 不需要创建 CLOB API Key、钱包或 User Channel 凭据；
-2. 不要把 Gamma 价格或单次 WebSocket 消息直接当作报价真相；
-3. 下一步必须完成 Token Source、REST 初始快照、周期对账和价格持久化；
-4. 在这些步骤完成前，页面不得宣称价格是可用于模拟预测的可靠实时价格。
+2. 页面读取未来版本化 API，不要直接连接 Polymarket，也不要直接查询 Provider 原始表；
+3. Gamma 价格只作为目录参考，正式展示价格来自 current read model；
+4. 价格可用于只读展示，但在 M1.4 新鲜度/降级状态和版本化 API 完成前不得承诺持续实时；
+5. 价格不能单独作为结算证据，结算仍需独立检测、复核和审计流程。
 
 ## 16. 健康检查
 

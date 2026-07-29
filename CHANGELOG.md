@@ -31,6 +31,16 @@
 - WebSocket 生命周期、消息、Warning 和最近时间进程内指标；
 - 官方契约 Fixture、动态订阅和模拟断线测试；
 - ADR-0004 CLOB Market WebSocket 决策；
+- CLOB REST `POST /books` 批量订单簿客户端、重试和官方契约测试；
+- PostgreSQL Token Source，只订阅本地 `open` 且具有 Token ID 的 Outcome；
+- `market_price_snapshots` 来源事件幂等键、来源 Hash、标准化证据和观察时间；
+- `market_current_prices` 持久化 current price read model；
+- bid、ask、midpoint、last trade 独立来源时间与乱序覆盖保护；
+- 十进制定点 midpoint 计算，避免二进制浮点漂移；
+- REST 启动快照与周期校准、WebSocket 串行有界写入队列；
+- 实时 Worker Session Advisory Leader Lock 和失锁重试；
+- 价格快照幂等、未知 Token、乱序事件和 Token Source PostgreSQL 集成测试；
+- 正式迁移 `0001_silly_siren.sql` 和 ADR-0005；
 - 根目录 `AGENTS.md`；
 - `docs/AI_PROJECT_HANDOFF.md`；
 - `docs/CURRENT_STATE.md`；
@@ -50,10 +60,10 @@
 - README 将 AI、新聊天和外部工程师接管入口置于首位；
 - 项目阶段升级为 M1.2 数据库迁移与可靠性基线完成；
 - Provider 包升级为 0.3.x，M1.3a CLOB WebSocket 客户端基础完成。
+- Provider/Worker 升级为 0.4.x、Database 升级为 0.2.x，M1.3b 实时价格数据闭环完成。
 
 ### Known limitations
 
-- Worker Token Source、REST 行情对账、价格快照写入和 current cache 尚未完成；
 - CLOB 真实网络长期运行、延迟/积压告警和恢复演练尚未完成；
 - 关闭/结算回查和管理后台尚未完成；
 - 真实官方 Fixture、长期契约变化监控和大数据性能测试尚未完成；

@@ -25,11 +25,14 @@ integrationTest('allows only one worker session to hold a query lock', async () 
   const lockName = 'polymarket:events-keyset:v1:integration-lock';
   const firstLock = await tryAcquirePostgresAdvisoryLock(requirePool(firstPool), lockName);
   assert.notEqual(firstLock, null);
+  if (firstLock === null) throw new Error('first advisory lock was not acquired');
 
   const competingLock = await tryAcquirePostgresAdvisoryLock(requirePool(secondPool), lockName);
   assert.equal(competingLock, null);
 
-  await firstLock?.release();
+  await firstLock.healthCheck();
+  await firstLock.release();
+  await assert.rejects(() => firstLock.healthCheck(), /already been released/);
 
   const lockAfterRelease = await tryAcquirePostgresAdvisoryLock(requirePool(secondPool), lockName);
   assert.notEqual(lockAfterRelease, null);
@@ -84,12 +87,15 @@ function requirePool(value: Pool | undefined): Pool {
 }
 
 function requireDatabaseUrl(): string {
-  if (databaseUrl === undefined) throw new Error('TEST_DATABASE_URL is required for integration tests');
+  if (databaseUrl === undefined)
+    throw new Error('TEST_DATABASE_URL is required for integration tests');
   return databaseUrl;
 }
 
 async function clearSyncRecords(pool: Pool, querySignature: string): Promise<void> {
   await pool.query('DELETE FROM provider_sync_pages WHERE query_signature = $1', [querySignature]);
   await pool.query('DELETE FROM provider_sync_runs WHERE query_signature = $1', [querySignature]);
-  await pool.query('DELETE FROM provider_sync_checkpoints WHERE query_signature = $1', [querySignature]);
+  await pool.query('DELETE FROM provider_sync_checkpoints WHERE query_signature = $1', [
+    querySignature,
+  ]);
 }
