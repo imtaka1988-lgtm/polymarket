@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 
 export interface PostgresAdvisoryLock {
+  healthCheck(): Promise<void>;
   release(): Promise<void>;
 }
 
@@ -29,6 +30,10 @@ function createLock(client: PoolClient, lockName: string): PostgresAdvisoryLock 
   let released = false;
 
   return {
+    async healthCheck(): Promise<void> {
+      if (released) throw new Error(`advisory lock ${lockName} has already been released`);
+      await client.query('SELECT 1');
+    },
     async release(): Promise<void> {
       if (released) return;
       released = true;

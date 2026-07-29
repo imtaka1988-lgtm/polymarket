@@ -1,10 +1,10 @@
 # Polymarket 数据接入与同步规范
 
-> 文档版本：V0.4
-> 适用代码：`@forecast/provider-polymarket` 0.3.x、`@forecast/worker` 0.3.x
+> 文档版本：V0.5
+> 适用代码：`@forecast/provider-polymarket` 0.4.x、`@forecast/worker` 0.4.x
 > 最后更新：2026-07-29  
 > 负责人：项目负责人 + AI/Codex  
-> 状态：Event Keyset、数据库可靠性和 CLOB WebSocket 基础已验证；REST 对账与价格持久化待建设
+> 状态：Event Keyset、数据库可靠性和 CLOB 实时价格数据闭环已验证；关闭/结算回查待建设
 
 ## 1. 文档目的
 
@@ -51,7 +51,7 @@ Polymarket 是首个外部 Provider，不是平台内部业务真相。平台先
 - Event 嵌套 Market 数据进入原始层和标准层。
 
 Gamma 响应中的 `bestBid`、`bestAsk` 和 `lastTradePrice` 只作为目录导入参考。
-正式实时行情需由 M1.3b 把 CLOB WebSocket、REST 对账和价格持久化接成闭环。
+M1.3b 已把 CLOB WebSocket、REST 对账和价格持久化接成正式实时行情闭环。
 
 ## 4. 为什么使用 Keyset
 
@@ -97,6 +97,8 @@ packages/provider-polymarket/src/
 ├── parsers.ts
 ├── normalizer.ts
 ├── events-keyset-sync.ts
+├── clob-rest-client.ts
+├── decimal.ts
 ├── market-token-subscription-registry.ts
 ├── market-websocket-contract.ts
 ├── market-websocket.ts
@@ -107,6 +109,9 @@ apps/worker/src/
 ├── index.ts
 ├── postgres-events-sync-store.ts
 ├── postgres-events-sync-store.integration.test.ts
+├── polymarket-realtime-worker.ts
+├── postgres-market-price-store.ts
+├── postgres-market-price-store.integration.test.ts
 ├── postgres-advisory-lock.ts
 └── postgres-advisory-lock.integration.test.ts
 
@@ -144,6 +149,14 @@ include_children=true
 
 ```dotenv
 POLYMARKET_GAMMA_BASE_URL=https://gamma-api.polymarket.com
+POLYMARKET_CLOB_BASE_URL=https://clob.polymarket.com
+POLYMARKET_MARKET_WS_URL=wss://ws-subscriptions-clob.polymarket.com/ws/market
+POLYMARKET_REALTIME_ENABLED=true
+POLYMARKET_REALTIME_LEADERSHIP_INTERVAL_MS=30000
+POLYMARKET_CLOB_REST_BATCH_SIZE=500
+POLYMARKET_TOKEN_REFRESH_INTERVAL_MS=60000
+POLYMARKET_REST_RECONCILIATION_INTERVAL_MS=60000
+POLYMARKET_WEBSOCKET_MAX_QUEUE_SIZE=10000
 POLYMARKET_SYNC_INTERVAL_MS=60000
 POLYMARKET_REQUEST_TIMEOUT_MS=10000
 POLYMARKET_SYNC_PAGE_SIZE=100
@@ -174,6 +187,11 @@ WORKER_DATABASE_POOL_SIZE=5
 
 - `markets`；
 - `market_outcomes`。
+
+### 实时价格层
+
+- `market_price_snapshots`：不可变 REST/WebSocket 价格更新、来源事件键和标准化证据；
+- `market_current_prices`：按 Outcome 的 current bid/ask/midpoint/last trade 读取模型。
 
 正式迁移由 Drizzle 生成并提交在 `packages/database/drizzle/`。CI 会检查 Schema 与迁移无漂移并真实执行迁移。
 
@@ -377,7 +395,7 @@ POLYMARKET_SYNC_ORDER=id
 
 禁止提供 `.env`、密码、Token、私钥、完整生产数据库或用户数据。
 
-## 19. CLOB Market WebSocket 基础
+## 19. CLOB 实时价格数据闭环
 
 ### 19.1 官方契约
 
@@ -442,19 +460,81 @@ Provider Adapter 将外部 snake_case 字段转换为内部 camelCase 事件，�
 非法 JSON、非文本消息或缺少关键标识的事件产生 Warning，不让 Worker 崩溃。
 外部原始字段不得泄漏到业务模块。
 
-### 19.5 当前边界
+### 19.5 PostgreSQL Token Source
 
-本切片完成 WebSocket 客户端、Registry、心跳、动态订阅、重连、完整重订阅、解析和进程内指标。
-尚未完成：
+Worker 只加载满足以下条件的 Outcome：
 
-- Worker 从数据库加载 Token 并自动维护 Registry；
-- REST 初始订单簿和周期对账；
-- `market_price_snapshots` 写入；
-- current price cache；
-- 数据延迟、积压和连续断线告警；
-- 真实网络长期运行与恢复演练。
+- 关联 `provider_markets.provider = 'polymarket'`；
+- 本地 `markets.status = 'open'`；
+- `market_outcomes.provider_outcome_id` 非空。
 
-因此当前 WebSocket 事件不能直接作为 Quote、预测或结算依据。
+Token 集合定时刷新并替换 Registry。市场不再 open 时自动取消订阅；新 open 市场自动加入。
+未匹配本地 Outcome 的外部 Token 不得创建孤立快照。
+
+### 19.6 REST 初始快照与周期校准
+
+使用公开 `POST https://clob.polymarket.com/books`，请求体为：
+
+```json
+[
+  { "token_id": "<token_id>" }
+]
+```
+
+按最多 500 个 Token 分批，复用超时、429/5xx 重试、指数退避和随机抖动。
+响应解析 market、asset_id、timestamp、hash、bids、asks、min_order_size、tick_size、
+neg_risk 和 last_trade_price。best bid 取最高买价，best ask 取最低卖价。
+
+官方依据：
+
+- <https://docs.polymarket.com/api-reference/market-data/get-order-books-request-body>
+- <https://docs.polymarket.com/api-reference/market-data/get-order-book>
+- <https://docs.polymarket.com/market-data/prices-order-books>
+
+Worker 获得实时 Leader Lock 后先执行 REST 快照，再打开 WebSocket；运行中定时重复校准。
+REST 失败保留最后成功价格，不清空 current read model。
+
+### 19.7 价格快照与 Current Read Model
+
+每个 REST 或 WebSocket 更新先写入 `market_price_snapshots`：
+
+- `source_event_key`：稳定 SHA-256 来源事件身份；
+- `source_hash`：官方 Order Book Hash 或交易 Hash；
+- `metadata`：标准化订单簿/事件证据；
+- `captured_at`：官方来源时间；
+- `observed_at`：本 Worker 收到时间。
+
+相同 `source_event_key` 只写一次。随后在同一事务更新 `market_current_prices`。
+bid、ask、midpoint、last trade 分别保存来源时间；旧事件仍可作为历史证据，但不得覆盖更新字段。
+midpoint 使用十进制定点计算，不使用 JavaScript 二进制浮点直接求平均。
+
+PostgreSQL current 表是前端和未来 Quote 的耐久读取边界。Redis 后续只能作为可重建热缓存。
+
+### 19.8 多实例和消息积压
+
+实时 Worker 使用 Session Advisory Lock：
+
+```text
+polymarket:market-realtime:v1
+```
+
+只有 Leader 建立 WebSocket、执行 REST 校准和写入价格；其他实例定时尝试接管。
+锁连接使用独立 Pool，并执行健康检查。
+
+WebSocket 事件进入有界串行队列，默认最多 10,000 条，避免突发消息耗尽数据库连接。
+队列溢出记录 `market_websocket_event_dropped`，后续由 REST 校准恢复。
+
+### 19.9 当前边界
+
+M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照、current read model、
+乱序保护、Leader Lock 和自动测试。仍未完成：
+
+- 数据新鲜度、连续断线、队列和连续失败生产告警；
+- 真实网络长期运行与恢复演练；
+- 关闭/结算市场滚动回查；
+- 前端和 Quote API。
+
+价格可作为后续只读展示和 Quote 的来源候选，但不能单独作为结算证据。
 
 ## 20. 当前测试覆盖
 
@@ -482,6 +562,14 @@ Provider Adapter 将外部 snake_case 字段转换为内部 camelCase 事件，�
 - 停止后不重连、空 Registry 关闭连接；
 - 大 Token 集合批量订阅；
 - 非法 JSON 和未知事件安全处理。
+- REST `/books` 批量、重试和官方 Order Book 契约；
+- 十进制定点 midpoint；
+- PostgreSQL Token Source 只加载 open Outcome；
+- 价格快照来源事件幂等；
+- 未知 Token 不创建孤立快照；
+- 乱序事件不回退 current 字段；
+- REST/WebSocket 统一写入和启动顺序；
+- 实时 Leader Lock 健康检查。
 
 仍需补充：
 
@@ -489,7 +577,7 @@ Provider Adapter 将外部 snake_case 字段转换为内部 camelCase 事件，�
 - 长期契约变化检测；
 - 大数据量性能测试；
 - 真实网络长连接和恢复演练；
-- 运行指标与告警。
+- 生产指标导出与告警。
 
 ## 21. 当前完成度与下一步
 
@@ -498,13 +586,13 @@ Provider Adapter 将外部 snake_case 字段转换为内部 camelCase 事件，�
 - Event Keyset 目录同步模块：约 96%；
 - 数据库迁移和持久化可靠性：约 97%；
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
-- 整个 M1 数据闭环：约 62%。
+- M1.3b CLOB 实时价格数据闭环：约 92%；
+- 整个 M1 数据闭环：约 74%。
 
-下一阶段是 M1.3：
+下一阶段是 M1.4：
 
-1. Worker 从 PostgreSQL 加载可订阅 Token，并维护 Registry；
-2. REST 初始订单簿和周期对账；
-3. `market_price_snapshots` 持久化；
-4. current price cache；
-5. 延迟、积压、断线和连续失败告警；
-6. 真实网络恢复演练。
+1. 关闭与结算市场滚动回查；
+2. degraded/只读状态；
+3. 数据新鲜度、积压、断线和连续失败告警；
+4. 真实网络恢复演练；
+5. 前端可依赖的版本化只读 API。

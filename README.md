@@ -2,8 +2,8 @@
 
 > **项目形态**：可扩展的娱乐型事件预测与游戏化互动平台  
 > **当前阶段**：M1 Provider 数据闭环  
-> **已完成阶段**：M1.3a CLOB WebSocket 客户端基础
-> **下一阶段**：M1.3b Token Source、REST 对账与价格持久化
+> **已完成阶段**：M1.3b CLOB 实时价格数据闭环
+> **下一阶段**：M1.4 关闭/结算回查、降级与可观测性
 > **核心边界**：只使用无现金价值、不可购买、不可提现、不可转让的免费虚拟积分。
 
 本项目以 Polymarket 公开市场数据作为首个外部来源。平台不依赖 Polymarket 用户账户、钱包或交易系统；所有模拟预测、积分、持仓与结算由本地系统管理。
@@ -34,6 +34,8 @@
 - 重复同步幂等和故障整页回滚；
 - 进程内锁和 PostgreSQL Advisory Lock；
 - CLOB Market WebSocket 动态订阅、心跳、重连、完整重订阅和契约测试；
+- PostgreSQL Token Source、REST `/books` 初始快照和周期校准；
+- 不可变价格快照、乱序保护的 current price read model 和实时 Leader Lock；
 - GitHub Actions PostgreSQL 16、迁移漂移检查、自动迁移和集成测试；
 - 不可变虚拟积分账本、结算版本、Outbox、审计和功能开关基线；
 - Doctor、Health、Verify、Support Bundle；
@@ -89,8 +91,8 @@ pnpm db:migrate
 
 ## 当前不是成品
 
-当前完成了工程底座、Event 目录同步、数据库可靠性验收和 CLOB WebSocket 客户端基础。
-尚未完成 Worker Token Source、REST 对账、价格持久化、完整用户系统、模拟预测闭环和管理后台。
+当前完成了工程底座、Event 目录同步、数据库可靠性验收和 CLOB 实时价格数据闭环。
+尚未完成关闭/结算回查、降级与告警、前端只读 API、完整用户系统、模拟预测闭环和管理后台。
 详细状态以 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) 和 Issue #2 为准。
 
 ## 安全底线

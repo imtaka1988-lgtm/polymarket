@@ -122,8 +122,7 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 
 ### `apps/worker`
 
-当前负责 Polymarket Event Keyset 同步。CLOB WebSocket 客户端基础已在 Provider 包完成，
-但 Worker Token Source 和价格持久化尚未接线。已经具备：
+当前负责 Polymarket Event Keyset 同步和 CLOB 实时价格数据闭环。已经具备：
 
 - 进程内防重入；
 - PostgreSQL Advisory Lock；
@@ -132,13 +131,19 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 - Cursor 恢复；
 - 原子页面提交；
 - 结构化日志。
+- PostgreSQL Token Source；
+- REST 启动快照和周期校准；
+- WebSocket 有界串行写入队列；
+- 不可变价格快照和 current price read model；
+- 乱序保护和实时 Leader Lock。
 
-下一步增加数据库 Token Source、REST 对账、价格快照、关闭/结算回查、Outbox、通知和数据保留。
+下一步增加关闭/结算回查、degraded 状态、可观测告警、Outbox、通知和数据保留。
 
 ### `packages/provider-polymarket`
 
 负责 Gamma 请求、Keyset、Cursor、重试、安全解析、标准化、Query Signature、同步编排，
-CLOB Token Registry、Market WebSocket 生命周期和实时事件标准化。业务模块不得直接依赖 Polymarket 原始字段。
+CLOB REST Order Book、Token Registry、Market WebSocket 生命周期和实时事件标准化。
+业务模块不得直接依赖 Polymarket 原始字段。
 
 ### `packages/database`
 
@@ -205,6 +210,11 @@ Worker 定时触发
 - Token Registry、动态订阅和动态取消；
 - `PING/PONG`、断线重连和完整重订阅；
 - 实时消息标准化、生命周期指标和故障测试；
+- REST 批量订单簿和周期校准；
+- PostgreSQL Token Source、不可变快照和 current price read model；
+- 来源事件幂等、逐字段乱序保护和十进制定点 midpoint；
+- 实时 Worker Leader Lock 和有界串行消息队列；
+- 正式价格迁移与 PostgreSQL 集成测试；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md` 和完整外援文档。
 
@@ -212,20 +222,12 @@ Worker 定时触发
 
 ## 9. 当前未完成
 
-### M1.3 实时行情
-
-- Worker 从 PostgreSQL 加载 Token 并维护 Registry；
-- REST 初始快照和周期对账；
-- 价格快照持久化；
-- current price cache；
-- 延迟、断线和积压告警；
-- 真实网络长期恢复演练。
-
 ### M1.4 回查和运营
 
 - 关闭与结算滚动回查；
 - degraded/只读模式；
-- 同步告警；
+- 同步、新鲜度、断线和队列告警；
+- 真实网络长期恢复演练；
 - 管理后台；
 - 用户端只读市场列表和详情。
 
@@ -245,8 +247,9 @@ Worker 定时触发
 - M1.1 Event Keyset：完成基线；
 - M1.2 数据库迁移与自动验收：完成；
 - M1.3a CLOB WebSocket 客户端基础：完成；
-- M1.3b Token Source、REST 对账与价格持久化：下一阶段；
-- M1.4 回查、后台和只读页面：待开始；
+- M1.3b Token Source、REST 对账与价格持久化：完成；
+- M1.4 回查、降级与可观测性：下一阶段；
+- M1.5 后台和只读页面：待开始；
 - M2 模拟预测闭环：未开始。
 
 精确进度以 Issue #2 和 `docs/CURRENT_STATE.md` 为准。

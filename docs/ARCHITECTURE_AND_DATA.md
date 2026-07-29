@@ -73,6 +73,8 @@ Polymarket / Future Providers
 - `provider_sync_pages`：完整原始页和 Request/Response Cursor；
 - `provider_events`：原始 Event；
 - `provider_markets`：原始 Market。
+- `market_price_snapshots`：REST/WebSocket 不可变价格更新；
+- `market_current_prices`：按 Outcome 的耐久 current price read model。
 
 ### 4.4 运行互斥
 
@@ -103,10 +105,22 @@ M1.3a 已建立 CLOB Market WebSocket Provider 基础：
 - 外部消息在 Provider Adapter 内标准化；
 - 生命周期与 Warning 有进程内指标。
 
-M1.3b 将由 Worker 从 PostgreSQL 加载可订阅 Token，REST 提供初始订单簿和断线校准，
-再把校准后的当前价格与历史快照写入缓存和 PostgreSQL。WebSocket 单独不能作为 Quote 或结算真相。
+M1.3b 已完成实时价格数据闭环：
 
-决策见 `docs/adr/0004-polymarket-clob-market-websocket.md`。
+- Worker 从 PostgreSQL 加载本地 `open` Outcome Token；
+- REST `POST /books` 提供启动快照和周期校准；
+- WebSocket 提供低延迟增量；
+- `market_price_snapshots` 保存不可变、幂等的价格证据；
+- `market_current_prices` 保存可恢复的 current read model；
+- bid、ask、midpoint、last trade 分别按来源时间保护，旧事件不能覆盖新字段；
+- midpoint 使用十进制定点算法；
+- WebSocket 通过有界串行队列写入；
+- 只有持有实时 Session Advisory Lock 的 Worker 建立外部连接。
+
+PostgreSQL current read model 是前端和未来 Quote 的耐久读取边界；Redis 以后只能作为可重建热缓存。
+价格不能单独作为结算真相。
+
+决策见 ADR-0004 和 ADR-0005。
 
 ## 5. 数据库迁移与验收
 
@@ -225,8 +239,7 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 
 ## 15. 当前已知架构缺口
 
-- CLOB WebSocket 客户端基础已实现，Worker Token Source 和价格写入尚未实现；
-- REST 初始行情和周期对账尚未实现；
+- CLOB WebSocket、Token Source、REST 校准和价格写入已实现；
 - 关闭和结算市场的独立滚动回查尚未实现；
 - 真实官方 Fixture 和长期契约监控尚未实现；
 - 管理后台尚不能查看同步运行和 Warning；

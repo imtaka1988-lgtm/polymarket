@@ -1,6 +1,6 @@
 # 故障排查与外部求助
 
-> 文档版本：V0.3  
+> 文档版本：V0.4
 > 最后更新：2026-07-29
 
 ## 1. 先保护数据，再找原因
@@ -143,8 +143,36 @@ pnpm db:migrate
 
 ### 市场价格不实时
 
-Gamma Keyset 只负责目录和 Token ID。CLOB WebSocket 客户端基础已经完成，但 Worker Token Source、
-REST 对账和价格持久化尚未接线，因此当前数据库价格不实时不属于 Event Keyset 故障。
+Gamma Keyset 只负责目录和 Token ID；正式价格来自 CLOB REST/WebSocket 闭环。依次检查：
+
+1. `POLYMARKET_REALTIME_ENABLED` 是否为 `true`；
+2. 数据库是否已执行 `0001_silly_siren.sql`；
+3. `markets.status` 是否为 `open`，Outcome 是否有 `provider_token_id`；
+4. 是否只有一个实例记录 `market_realtime_started`，其他实例等待实时 Leader Lock；
+5. REST `/books` 校准是否成功，WebSocket 是否已订阅；
+6. `market_price_snapshots` 是否继续增加；
+7. `market_current_prices` 的字段 captured time 是否前进；
+8. Provider 是否连续 429/5xx 或网络是否阻止 WSS。
+
+不要用 Gamma 目录价格覆盖 current read model，也不要删除快照或手工修改字段时间。
+
+### 有历史快照但 current 价格不更新
+
+先比较该快照 `captured_at` 与 current 对应字段的 captured time。旧事件会保存为历史证据，
+但按设计不会覆盖更新字段。若新事件仍不能更新，检查 Token 映射是否歧义、价格是否超出
+`0..1`、来源时间是否缺失，以及事务日志中的 Store 错误。
+
+### `market_websocket_event_dropped`
+
+有界队列已达到 `POLYMARKET_WEBSOCKET_MAX_QUEUE_SIZE`。系统会丢弃新增消息并等待 REST 周期校准恢复。
+检查数据库写入延迟、连接池、消息突发和队列高水位。不要把队列改成无界；可在验证容量后小幅
+提高上限，并优先修复持续的数据库慢写。
+
+### 实时 Leader 反复切换
+
+检查专用 Lock Pool 的数据库连接、网络中断和 `market_realtime_lock_health_check_failed`。
+实时锁必须使用独立 Session，不能复用 Store Pool。Session 失效时当前实例应先停止
+WebSocket/REST，再重新竞选；不要关闭锁或让每个副本都连接行情。
 
 ### Market WebSocket 没有建立连接
 
