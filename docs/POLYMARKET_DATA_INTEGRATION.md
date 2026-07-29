@@ -1,10 +1,10 @@
 # Polymarket 数据接入与同步规范
 
-> 文档版本：V0.3  
-> 适用代码：`@forecast/provider-polymarket` 0.2.x、`@forecast/worker` 0.3.x  
+> 文档版本：V0.4
+> 适用代码：`@forecast/provider-polymarket` 0.3.x、`@forecast/worker` 0.3.x
 > 最后更新：2026-07-29  
 > 负责人：项目负责人 + AI/Codex  
-> 状态：Event Keyset 与数据库可靠性基线已验证，实时行情待建设
+> 状态：Event Keyset、数据库可靠性和 CLOB WebSocket 基础已验证；REST 对账与价格持久化待建设
 
 ## 1. 文档目的
 
@@ -50,7 +50,8 @@ Polymarket 是首个外部 Provider，不是平台内部业务真相。平台先
 - Cursor 作为不透明令牌原样保存；
 - Event 嵌套 Market 数据进入原始层和标准层。
 
-Gamma 响应中的 `bestBid`、`bestAsk` 和 `lastTradePrice` 只作为目录导入参考。正式实时行情将在 M1.3 使用 CLOB WebSocket 和 REST 对账。
+Gamma 响应中的 `bestBid`、`bestAsk` 和 `lastTradePrice` 只作为目录导入参考。
+正式实时行情需由 M1.3b 把 CLOB WebSocket、REST 对账和价格持久化接成闭环。
 
 ## 4. 为什么使用 Keyset
 
@@ -96,6 +97,9 @@ packages/provider-polymarket/src/
 ├── parsers.ts
 ├── normalizer.ts
 ├── events-keyset-sync.ts
+├── market-token-subscription-registry.ts
+├── market-websocket-contract.ts
+├── market-websocket.ts
 ├── errors.ts
 └── *.test.ts
 
@@ -373,7 +377,86 @@ POLYMARKET_SYNC_ORDER=id
 
 禁止提供 `.env`、密码、Token、私钥、完整生产数据库或用户数据。
 
-## 19. 当前测试覆盖
+## 19. CLOB Market WebSocket 基础
+
+### 19.1 官方契约
+
+- 地址：`wss://ws-subscriptions-clob.polymarket.com/ws/market`；
+- 初始订阅：`{"type":"market","assets_ids":["<token_id>"]}`；
+- 动态增加：`{"operation":"subscribe","assets_ids":["<token_id>"]}`；
+- 动态删除：`{"operation":"unsubscribe","assets_ids":["<token_id>"]}`；
+- 心跳：客户端每 10 秒发送文本 `PING`，服务端回复文本 `PONG`；
+- 标准事件：`book`、`price_change`、`last_trade_price`、`tick_size_change`；
+- 启用 `custom_feature_enabled` 后可接收 `best_bid_ask`、`new_market` 和 `market_resolved`。
+
+官方文档：
+
+- <https://docs.polymarket.com/api-reference/wss/market>
+- <https://docs.polymarket.com/market-data/realtime-data>
+- <https://docs.polymarket.com/market-data/prices-order-books>
+
+### 19.2 Token Subscription Registry
+
+Registry 保存进程当前“期望订阅集合”，负责：
+
+- Token ID 去空白和去重；
+- 动态增加、删除和全量替换；
+- 生成 added/removed 差异；
+- 提供排序后的确定性快照；
+- 断线期间保留期望状态。
+
+后续 Worker Token Source 必须从 PostgreSQL 中已审核、可交易的本地 Market/Outcome 重建 Registry，
+不能把 WebSocket 当前连接状态当作业务真相。
+
+### 19.3 连接生命周期
+
+```text
+Registry 非空
+→ connecting
+→ 打开连接
+→ 发送完整初始订阅
+→ 每 10 秒 PING
+→ 动态 subscribe/unsubscribe
+→ 断线
+→ 指数退避加随机抖动
+→ 新连接
+→ 从 Registry 完整重订阅
+```
+
+停止客户端或 Registry 为空时取消重连并关闭空闲连接。大订阅集合按配置批量发送，
+避免单一帧无限增长。
+
+### 19.4 解析边界
+
+Provider Adapter 将外部 snake_case 字段转换为内部 camelCase 事件，当前标准化：
+
+- Order Book；
+- Price Change；
+- Last Trade Price；
+- Tick Size Change；
+- Best Bid/Ask；
+- New Market；
+- Market Resolved；
+- 未知事件类型。
+
+非法 JSON、非文本消息或缺少关键标识的事件产生 Warning，不让 Worker 崩溃。
+外部原始字段不得泄漏到业务模块。
+
+### 19.5 当前边界
+
+本切片完成 WebSocket 客户端、Registry、心跳、动态订阅、重连、完整重订阅、解析和进程内指标。
+尚未完成：
+
+- Worker 从数据库加载 Token 并自动维护 Registry；
+- REST 初始订单簿和周期对账；
+- `market_price_snapshots` 写入；
+- current price cache；
+- 数据延迟、积压和连续断线告警；
+- 真实网络长期运行与恢复演练。
+
+因此当前 WebSocket 事件不能直接作为 Quote、预测或结算依据。
+
+## 20. 当前测试覆盖
 
 已覆盖：
 
@@ -391,28 +474,37 @@ POLYMARKET_SYNC_ORDER=id
 - SQL 故障回滚；
 - 失败页不推进累计计数；
 - PostgreSQL Advisory Lock 互斥、释放与单连接 Store 不自阻塞。
+- Token Registry 去重、增加、删除和替换；
+- 官方 Order Book、Price Change、Last Trade、Tick Size、New Market 和 Market Resolved 契约 Fixture；
+- 初始订阅、动态订阅和动态取消；
+- 10 秒 `PING/PONG` 心跳；
+- 指数退避重连和完整重订阅；
+- 停止后不重连、空 Registry 关闭连接；
+- 大 Token 集合批量订阅；
+- 非法 JSON 和未知事件安全处理。
 
 仍需补充：
 
 - 脱敏真实官方 Fixture；
 - 长期契约变化检测；
 - 大数据量性能测试；
-- CLOB WebSocket 断线和重订阅测试；
+- 真实网络长连接和恢复演练；
 - 运行指标与告警。
 
-## 20. 当前完成度与下一步
+## 21. 当前完成度与下一步
 
 工程评估：
 
 - Event Keyset 目录同步模块：约 96%；
 - 数据库迁移和持久化可靠性：约 97%；
-- 整个 M1 数据闭环：约 57%。
+- M1.3a CLOB WebSocket 客户端基础：约 90%；
+- 整个 M1 数据闭环：约 62%。
 
 下一阶段是 M1.3：
 
-1. CLOB Market WebSocket；
-2. Token 订阅注册表；
-3. 断线重连与全量重订阅；
-4. REST 初始快照和周期对账；
-5. 价格快照持久化；
-6. 延迟和断线可观测性。
+1. Worker 从 PostgreSQL 加载可订阅 Token，并维护 Registry；
+2. REST 初始订单簿和周期对账；
+3. `market_price_snapshots` 持久化；
+4. current price cache；
+5. 延迟、积压、断线和连续失败告警；
+6. 真实网络恢复演练。

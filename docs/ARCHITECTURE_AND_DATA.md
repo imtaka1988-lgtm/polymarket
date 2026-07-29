@@ -92,7 +92,21 @@ Advisory Lock 的逻辑名称使用 Query Signature。多个不同查询可并�
 
 ### 4.5 实时行情边界
 
-Gamma Keyset 解决目录、规则和初始字段，不解决长期实时价格。下一阶段 CLOB WebSocket 将更新当前价格缓存和历史价格快照，REST 用于初始快照和断线校准。
+Gamma Keyset 解决目录、规则和 Token ID，不解决长期实时价格。
+
+M1.3a 已建立 CLOB Market WebSocket Provider 基础：
+
+- Token Subscription Registry 是期望订阅集合；
+- 支持动态 subscribe/unsubscribe；
+- 每 10 秒 `PING/PONG`；
+- 断线指数退避和完整重订阅；
+- 外部消息在 Provider Adapter 内标准化；
+- 生命周期与 Warning 有进程内指标。
+
+M1.3b 将由 Worker 从 PostgreSQL 加载可订阅 Token，REST 提供初始订单簿和断线校准，
+再把校准后的当前价格与历史快照写入缓存和 PostgreSQL。WebSocket 单独不能作为 Quote 或结算真相。
+
+决策见 `docs/adr/0004-polymarket-clob-market-websocket.md`。
 
 ## 5. 数据库迁移与验收
 
@@ -211,7 +225,7 @@ draft → pending_review → open → suspended/closed → resolving → resolve
 
 ## 15. 当前已知架构缺口
 
-- CLOB WebSocket 尚未实现；
+- CLOB WebSocket 客户端基础已实现，Worker Token Source 和价格写入尚未实现；
 - REST 初始行情和周期对账尚未实现；
 - 关闭和结算市场的独立滚动回查尚未实现；
 - 真实官方 Fixture 和长期契约监控尚未实现；

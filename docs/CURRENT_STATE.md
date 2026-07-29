@@ -2,8 +2,8 @@
 
 > 状态日期：2026-07-29  
 > 项目阶段：M1 Provider 数据闭环  
-> 当前完成：M1.2 数据库迁移与自动验收  
-> 下一工作：M1.3 CLOB 实时行情  
+> 当前完成：M1.3a CLOB WebSocket 客户端基础
+> 下一工作：M1.3b Token Source、REST 对账与价格持久化
 > 权威任务：GitHub Issue #2  
 > 状态规则：本文件每次功能 PR 必须更新
 
@@ -13,6 +13,7 @@
 - PR #3：Polymarket Events Keyset 可恢复同步；
 - PR #4：正式迁移、PostgreSQL 自动验收、分布式锁和 AI/外援接管文档（本状态随 PR #4 合并生效）。
 - PR #5：同步连接池隔离、失败页计数修复、单连接 Store 验收和冻结依赖基线。
+- PR #6：M1.3a CLOB WebSocket 契约、Token Registry、断线恢复和文档基线（本状态随 PR #6 合并生效）。
 
 ## 2. 当前已经具备
 
@@ -42,6 +43,15 @@
 - 根目录 `AGENTS.md`；
 - AI/外部工程师完整接管文档；
 - 零基础施工、外援、排错和架构文档。
+- CLOB Market WebSocket 官方契约和 ADR-0004；
+- Token Subscription Registry；
+- 初始订阅、动态增加和动态删除订阅；
+- 10 秒 `PING/PONG` 心跳；
+- 断线指数退避、随机抖动和完整重订阅；
+- 大 Token 集合批量订阅；
+- Order Book、Price Change、Last Trade、Tick Size、Best Bid/Ask、New Market 和 Market Resolved 标准化；
+- WebSocket 生命周期、消息和 Warning 进程内指标；
+- 单元、官方契约 Fixture 和模拟断线测试。
 
 ## 3. M1.2 自动验收结果
 
@@ -67,14 +77,13 @@ GitHub Actions 已真实验证：
 
 ### M1.3 实时行情
 
-- CLOB Market WebSocket；
-- 动态 Token 订阅注册表；
-- 断线重连和完整重新订阅；
+- Worker 从 PostgreSQL 加载可订阅 Token 并维护 Registry；
 - REST 初始订单簿/价格快照；
 - 定时 REST 对账；
 - 价格快照持久化；
-- 延迟、断线和积压指标；
-- WebSocket 契约和断线测试。
+- current price cache；
+- 延迟、断线、连续失败和积压告警；
+- 真实网络长期运行与恢复演练。
 
 ### M1.4 回查和运营
 
@@ -97,7 +106,8 @@ GitHub Actions 已真实验证：
 ## 5. 当前已知风险
 
 - Keyset 推荐排序 `updatedAt,id` 仍需要真实官方长期 Fixture 和契约验证；
-- 当前尚未具备 CLOB 实时行情；
+- WebSocket 客户端基础已完成，但尚未接入数据库 Token Source 和价格持久化；
+- 只有 WebSocket 没有 REST 对账会存在断线窗口数据缺口；
 - 外部字段可能变化，必须保存原始响应并维护 Fixture；
 - 不能把 `closed` 直接解释为本地已结算；
 - 尚未完成 Provider 运行告警和管理后台；
@@ -105,12 +115,13 @@ GitHub Actions 已真实验证：
 
 ## 6. 完成度口径
 
-PR #4 自动验收完成后的工程评估：
+PR #5 可靠性验收和 PR #6 M1.3a WebSocket 基础完成后的工程评估：
 
 - Event Keyset 目录同步模块：约 96%；
 - M1.2 数据库迁移与持久化可靠性：约 97%；
-- 整个 M1 数据闭环：约 57%；
-- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 12%–15%。
+- M1.3a CLOB WebSocket 客户端基础：约 90%；
+- 整个 M1 数据闭环：约 62%；
+- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 14%–17%。
 
 剩余 Event Keyset 优化主要是：真实官方 Fixture、长期契约监控、大数据性能测试和运行告警。
 
@@ -121,4 +132,4 @@ PR #4 自动验收完成后的工程评估：
 3. 读取 `docs/DATABASE_ACCEPTANCE.md`；
 4. 查看 Issue #2；
 5. 检查最新 main Commit、PR 和 GitHub Actions；
-6. 进入 M1.3 CLOB 实时行情，不要跳到用户预测或页面装饰。
+6. 进入 M1.3b Token Source、REST 对账和价格持久化，不要跳到用户预测或页面装饰。

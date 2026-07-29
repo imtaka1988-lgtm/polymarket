@@ -122,7 +122,8 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 
 ### `apps/worker`
 
-当前负责 Polymarket Event Keyset 同步，已经具备：
+当前负责 Polymarket Event Keyset 同步。CLOB WebSocket 客户端基础已在 Provider 包完成，
+但 Worker Token Source 和价格持久化尚未接线。已经具备：
 
 - 进程内防重入；
 - PostgreSQL Advisory Lock；
@@ -132,11 +133,12 @@ NestJS API。当前主要有健康检查，未来承载身份、市场查询、�
 - 原子页面提交；
 - 结构化日志。
 
-未来增加 CLOB WebSocket、REST 对账、关闭/结算回查、Outbox、通知和数据保留。
+下一步增加数据库 Token Source、REST 对账、价格快照、关闭/结算回查、Outbox、通知和数据保留。
 
 ### `packages/provider-polymarket`
 
-负责 Gamma 请求、Keyset、Cursor、重试、安全解析、标准化、Query Signature 和同步编排。业务模块不得直接依赖 Polymarket 原始字段。
+负责 Gamma 请求、Keyset、Cursor、重试、安全解析、标准化、Query Signature、同步编排，
+CLOB Token Registry、Market WebSocket 生命周期和实时事件标准化。业务模块不得直接依赖 Polymarket 原始字段。
 
 ### `packages/database`
 
@@ -176,7 +178,7 @@ Worker 定时触发
 
 ## 8. 当前已完成
 
-以 `main` 最新合并状态为准。PR #4 与 PR #5 合并后包括：
+以 `main` 最新合并状态为准。PR #4、PR #5 与 PR #6 合并后包括：
 
 - Monorepo、Web/API/Worker 边界；
 - 核心领域和数据库 Schema；
@@ -199,6 +201,10 @@ Worker 定时触发
 - 失败页面不会污染累计页数和累计事件数；
 - Provider 单元测试；
 - PostgreSQL Store 和 Lock 集成测试；
+- CLOB Market WebSocket 官方契约和 ADR-0004；
+- Token Registry、动态订阅和动态取消；
+- `PING/PONG`、断线重连和完整重订阅；
+- 实时消息标准化、生命周期指标和故障测试；
 - CI 测试、类型检查和生产构建；
 - 根目录 `AGENTS.md` 和完整外援文档。
 
@@ -208,13 +214,12 @@ Worker 定时触发
 
 ### M1.3 实时行情
 
-- CLOB Market WebSocket；
-- Token 动态订阅注册表；
-- 断线重连与完整重订阅；
+- Worker 从 PostgreSQL 加载 Token 并维护 Registry；
 - REST 初始快照和周期对账；
 - 价格快照持久化；
-- 延迟、断线和积压指标；
-- WebSocket 契约和故障测试。
+- current price cache；
+- 延迟、断线和积压告警；
+- 真实网络长期恢复演练。
 
 ### M1.4 回查和运营
 
@@ -239,7 +244,8 @@ Worker 定时触发
 - M0 工程基线：完成；
 - M1.1 Event Keyset：完成基线；
 - M1.2 数据库迁移与自动验收：完成；
-- M1.3 CLOB 实时行情：下一阶段；
+- M1.3a CLOB WebSocket 客户端基础：完成；
+- M1.3b Token Source、REST 对账与价格持久化：下一阶段；
 - M1.4 回查、后台和只读页面：待开始；
 - M2 模拟预测闭环：未开始。
 
