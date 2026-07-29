@@ -1,2 +1,5 @@
-# polymarket
-I don't give a fuck.
+# Event Forecast Lab
+
+> 可扩展的娱乐型事件预测与游戏化互动平台。
+
+本仓库正在建立首版工程基线。完整项目说明、零基础施工手册、系统架构、数据模型、自检工具和可运行代码骨架将在初始化分支中提交，并通过 Pull Request 合并到 `main`。
