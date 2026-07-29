@@ -13,6 +13,7 @@
 - PR #3：Polymarket Events Keyset 可恢复同步；
 - PR #4：正式迁移、PostgreSQL 自动验收、分布式锁和 AI/外援接管文档（本状态随 PR #4 合并生效）。
 - PR #5：同步连接池隔离、失败页计数修复、单连接 Store 验收和冻结依赖基线。
+- PR #6：M1.3a CLOB WebSocket 契约、Token Registry、断线恢复和文档基线（本状态随 PR #6 合并生效）。
 
 ## 2. 当前已经具备
 
@@ -114,7 +115,7 @@ GitHub Actions 已真实验证：
 
 ## 6. 完成度口径
 
-PR #5 可靠性验收和 M1.3a WebSocket 基础完成后的工程评估：
+PR #5 可靠性验收和 PR #6 M1.3a WebSocket 基础完成后的工程评估：
 
 - Event Keyset 目录同步模块：约 96%；
 - M1.2 数据库迁移与持久化可靠性：约 97%；
