@@ -17,6 +17,7 @@
 - PR #7：M1.3b CLOB REST/WebSocket 价格闭环、耐久 current read model 和实时 Leader Lock（本状态随 PR #7 合并生效）。
 - PR #8：M1.4 生命周期回查、degraded 状态、耐久告警和人工复核候选（本状态随 PR #8 合并生效）。
 - PR #9：M1.5 版本化只读市场、价格、平台状态和稳定错误契约（本状态随 PR #9 合并生效）。
+- PR #10：数据库测试环境 fail-closed 和 CI direct integration 防伪绿验收（本状态随 PR #10 合并生效）。
 
 ## 2. 当前已经具备
 
