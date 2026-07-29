@@ -1,7 +1,7 @@
 # 故障排查与外部求助
 
-> 文档版本：V0.6
-> 最后更新：2026-07-29
+> 文档版本：V0.7
+> 最后更新：2026-07-30
 
 ## 1. 先保护数据，再找原因
 
@@ -36,6 +36,28 @@
 
 V1 API 错误体必须包含稳定 `error.code` 和与响应头一致的 `x-request-id`。若客户端收到
 `INTERNAL_ERROR`，用 Request ID 查结构化日志；不要把服务端堆栈、`last_error` 或告警详情复制到页面。
+
+### API liveness 正常但 readiness 失败
+
+`/api/v1/health/live` 返回 200 只说明 API 进程可响应。`/api/v1/health/ready` 返回
+`503 DATABASE_NOT_READY` 表示 PostgreSQL 查询失败。依次检查 `DATABASE_URL`、迁移、数据库网络、
+只读角色的连接权限和连接数；负载均衡器应停止向该实例发送业务请求，但不要因为一次外部 Provider
+故障重启 API。
+
+### API 请求变慢或数据库查询超时
+
+用 Request ID 查 `api_request_completed`，比较 `durationMs`、`statusCode` 和 warning 日志。
+默认单条 SQL 超时为 `API_DATABASE_STATEMENT_TIMEOUT_MS=5000`，慢请求阈值为
+`API_SLOW_REQUEST_THRESHOLD_MS=1000`。市场列表优先确认：
+
+1. 迁移 `0003_thankful_crusher_hogan.sql` 已执行；
+2. `markets_public_feed_idx` 存在；
+3. 状态数组仍展开为逐状态 LATERAL 等值索引扫描，没有改回 text cast 或 `ANY(array)`；
+4. 排序仍显式使用 `DESC NULLS LAST`，与 Drizzle 索引规格一致；
+5. `ANALYZE markets` 最近执行；
+6. 前端 `limit` 不超过 100，且使用 Cursor 而不是 Offset。
+
+不要通过无限增大 statement timeout 掩盖缺失索引，也不要把完整 URL、Cursor 或数据库错误写进公开日志。
 
 ### 市场列表分页重复、缺失或 400
 

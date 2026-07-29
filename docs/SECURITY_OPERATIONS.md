@@ -36,6 +36,10 @@ Provider degraded 时，V1 API 保留最后成功数据并返回 `readOnly=true`
 `last_error`、告警 message/details 或 Provider 原始 payload。生产 API 数据库角色必须只授予
 公开 read model 所需的 SELECT 权限。
 
+API 负载均衡使用 `/api/v1/health/ready`，进程监管使用 `/api/v1/health/live`。数据库查询设置
+statement timeout，防止慢查询长期耗尽连接池。`api_request_completed` 只记录 Request ID、方法、
+无查询字符串路径、状态和耗时；不得记录 Cursor、Token、Cookie、Provider payload 或数据库凭据。
+
 ## 7. 事故等级
 
 - SEV-1：数据损坏、账本错误、大范围不可用

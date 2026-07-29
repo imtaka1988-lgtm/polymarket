@@ -54,6 +54,11 @@
 - healthy/degraded/unavailable 与保守 `readOnly` 聚合；
 - 十进制价格字符串、稳定错误代码和端到端 Request ID；
 - API PostgreSQL HTTP 集成测试和内部告警字段防泄漏回归测试；
+- 公开市场 `markets_public_feed_idx(status, updated_at DESC, id DESC)` 和正式迁移
+  `0003_thankful_crusher_hogan.sql`；
+- 2 万行 PostgreSQL 实际查询计划和两页 Keyset 不重不漏集成测试；
+- API PostgreSQL statement timeout、`/health/live` 与真实数据库 `/health/ready`；
+- `api_request_completed` 结构化请求耗时日志、慢请求和 5xx warning；
 - `docs/API_READ_CONTRACT.md` 和 ADR-0007；
 - 根目录 `AGENTS.md`；
 - `docs/AI_PROJECT_HANDOFF.md`；
@@ -79,13 +84,17 @@
 - API 升级为 0.2.x，M1.5 版本化只读 API 完成。
 - 数据库测试跨 Workspace 包串行，避免 API 与 Worker 验收清理互相污染。
 - Turbo `test` 显式透传数据库验收环境；CI required integration Step 禁止 PostgreSQL 测试静默 SKIP。
+- 市场状态数组改为逐状态有界 LATERAL 等值索引扫描，避免 text cast 和 `ANY(array)`
+  阻止复合索引排序。
+- 市场 Keyset 排序显式使用 `NULLS LAST`，与 Drizzle 降序索引规格一致，防止查询计划回退为
+  `Seq Scan + Sort`。
 
 ### Known limitations
 
 - CLOB 真实网络长期运行和部署环境恢复演练尚未完成；
 - 管理后台和用户端只读页面尚未完成；
 - 生产只读数据库角色、API 缓存和速率限制尚待部署配置；
-- 真实官方 Fixture、长期契约变化监控和大数据性能测试尚未完成；
+- 真实官方 Fixture、长期契约变化监控和 staging 百万级容量压测尚未完成；
 
 ## [0.1.0] - 2026-07-29
 

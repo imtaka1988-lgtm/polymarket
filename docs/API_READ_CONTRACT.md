@@ -1,7 +1,7 @@
 # 版本化只读 API 契约
 
-> 文档版本：V1.0  
-> 最后更新：2026-07-29  
+> 文档版本：V1.1
+> 最后更新：2026-07-30
 > 适用代码：`@forecast/api` 0.2.x  
 > 状态：M1.5 已实现
 
@@ -15,7 +15,9 @@ Provider 原始 payload、内部错误、告警详情、凭据或数据库内部
 
 | 方法 | 路径                           | 用途                                  |
 | ---- | ------------------------------ | ------------------------------------- |
-| GET  | `/api/v1/health`               | API 进程存活检查                      |
+| GET  | `/api/v1/health`               | 兼容的 API 进程存活检查               |
+| GET  | `/api/v1/health/live`          | API 进程存活检查                      |
+| GET  | `/api/v1/health/ready`         | API 与 PostgreSQL 就绪检查            |
 | GET  | `/api/v1/markets`              | 市场列表和稳定 Cursor 分页            |
 | GET  | `/api/v1/markets/{id}`         | 单个公开市场详情                      |
 | GET  | `/api/v1/markets/{id}/prices`  | Outcome current price                 |
@@ -39,8 +41,13 @@ Provider 原始 payload、内部错误、告警详情、凭据或数据库内部
 
 ## 3. 分页稳定性
 
-市场按 `(updated_at DESC, id DESC)` 排序。Cursor 是不透明的 V1 Base64URL 值，内部保存最后一项的
+市场按 `(updated_at DESC NULLS LAST, id DESC NULLS LAST)` 排序。两列均为 `NOT NULL`，显式
+NULL 顺序用于与正式索引规格完全一致。Cursor 是不透明的 V1 Base64URL 值，内部保存最后一项的
 排序元组。客户端必须原样回传，不能解析、修改或自行生成。
+
+服务端把每个请求状态展开为独立、有界的等值索引扫描，再合并最多
+`状态数 × (limit + 1)` 条候选。因此默认 `open` 和 `status=all` 都能使用同一复合索引，
+不会因参数数组退化为全表扫描后排序。
 
 列表响应：
 
@@ -124,6 +131,7 @@ V1 当前稳定错误代码：
 - `INVALID_ID`
 - `DUPLICATE_QUERY_PARAMETER`
 - `MARKET_NOT_FOUND`
+- `DATABASE_NOT_READY`
 - `ROUTE_NOT_FOUND`
 - `INTERNAL_ERROR`
 
@@ -133,10 +141,18 @@ V1 当前稳定错误代码：
 
 - `API_PORT`：默认 4000
 - `API_DATABASE_POOL_MAX`：默认 10，必须为正整数
+- `API_DATABASE_STATEMENT_TIMEOUT_MS`：单条 PostgreSQL 查询超时，默认 5000ms，必须为正整数
+- `API_SLOW_REQUEST_THRESHOLD_MS`：请求完成日志升级为 warning 的阈值，默认 1000ms
 - `API_CORS_ORIGINS`：允许的前端 Origin，逗号分隔；本地默认 `http://localhost:3000`
 - `DATABASE_URL`：API 只读查询使用的 PostgreSQL
 
 生产环境应给 API 使用数据库只读角色。CORS 只允许 GET、HEAD、OPTIONS，不携带 Cookie。
+`/health/live` 只证明进程可响应，`/health/ready` 会真实执行 `SELECT 1`；负载均衡器应使用 readiness
+决定是否接收流量，进程监管使用 liveness 判断是否需要重启。
+
+每个完成请求记录 `api_request_completed` JSON 日志，包含 Request ID、method、无查询字符串的
+path、status code 和 duration ms。慢请求和 5xx 使用 warning；日志不得记录 Cursor、完整 URL、
+Provider payload 或凭据。
 
 ## 8. 自动验收
 
@@ -145,12 +161,16 @@ V1 当前稳定错误代码：
 - Cursor 往返、边界和非法输入；
 - 默认公开状态和分页大小；
 - `(updated_at,id)` 跨页不重不漏；
+- 2 万行数据集上两页各 100 条仍不重不漏；
+- PostgreSQL 查询计划命中 `markets_public_feed_idx`；
 - draft 市场不能从 `status=all` 泄漏；
 - 详情与价格的字段、十进制精度和来源时间；
 - 稳定错误体和 Request ID；
 - healthy/degraded/readOnly 转换；
 - 内部告警 message/details 不出现在公开响应；
 - API、Worker PostgreSQL 测试跨包串行，避免测试清理互相污染。
+- 兼容 health、liveness、数据库 readiness 和 readiness 失败关闭；
+- 结构化请求耗时日志字段、慢请求 warning 和查询字符串隔离；
 - CI 以 `REQUIRE_TEST_DATABASE=true` 强制数据库 URL 存在，并绕过 Turbo 再直接执行集成测试；
   任何 SKIP 都不能作为 PostgreSQL 验收证据。
 

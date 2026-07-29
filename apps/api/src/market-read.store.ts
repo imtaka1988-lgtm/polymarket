@@ -24,29 +24,39 @@ export class MarketReadStore {
     cursor: MarketCursor | null;
   }): Promise<MarketListResult> {
     const result = await this.pool.query<MarketRow>(
-      `WITH page AS (
-         SELECT
-           m.id,
-           m.title,
-           m.kind,
-           m.status::text AS status,
-           m.original_rules,
-           m.rules_summary,
-           m.opens_at,
-           m.closes_at,
-           m.resolved_at,
-           m.schema_version,
-           m.updated_at,
-           pm.provider,
-           pm.provider_market_id
-         FROM markets m
-         LEFT JOIN provider_markets pm ON pm.id = m.provider_market_id
-         WHERE m.status::text = ANY($1::text[])
-           AND (
-             $2::timestamptz IS NULL
-             OR (m.updated_at, m.id) < ($2::timestamptz, $3::uuid)
-           )
-         ORDER BY m.updated_at DESC, m.id DESC
+      `WITH status_pages AS (
+         SELECT candidate.*
+         FROM unnest($1::market_status[]) AS requested(status)
+         CROSS JOIN LATERAL (
+           SELECT
+             m.id,
+             m.title,
+             m.kind,
+             m.status::text AS status,
+             m.original_rules,
+             m.rules_summary,
+             m.opens_at,
+             m.closes_at,
+             m.resolved_at,
+             m.schema_version,
+             m.updated_at,
+             pm.provider,
+             pm.provider_market_id
+           FROM markets m
+           LEFT JOIN provider_markets pm ON pm.id = m.provider_market_id
+           WHERE m.status = requested.status
+             AND (
+               $2::timestamptz IS NULL
+               OR (m.updated_at, m.id) < ($2::timestamptz, $3::uuid)
+             )
+           ORDER BY m.updated_at DESC NULLS LAST, m.id DESC NULLS LAST
+           LIMIT $4
+         ) AS candidate
+       ),
+       page AS (
+         SELECT *
+         FROM status_pages
+         ORDER BY updated_at DESC NULLS LAST, id DESC NULLS LAST
          LIMIT $4
        )
        SELECT
@@ -67,7 +77,10 @@ export class MarketReadStore {
        FROM page
        LEFT JOIN market_outcomes mo ON mo.market_id = page.id
        LEFT JOIN market_current_prices mcp ON mcp.outcome_id = mo.id
-       ORDER BY page.updated_at DESC, page.id DESC, mo.sort_order ASC`,
+       ORDER BY
+         page.updated_at DESC NULLS LAST,
+         page.id DESC NULLS LAST,
+         mo.sort_order ASC`,
       [input.statuses, input.cursor?.updatedAt ?? null, input.cursor?.id ?? null, input.limit + 1],
     );
     const grouped = groupMarkets(result.rows);
@@ -92,7 +105,7 @@ export class MarketReadStore {
     const result = await this.pool.query<MarketRow>(
       `${MARKET_DETAIL_SELECT}
        WHERE m.id = $1
-         AND m.status::text = ANY($2::text[])
+         AND m.status = ANY($2::market_status[])
        ORDER BY mo.sort_order ASC`,
       [id, PUBLIC_STATUS_VALUES],
     );
