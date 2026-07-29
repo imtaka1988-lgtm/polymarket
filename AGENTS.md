@@ -10,13 +10,14 @@
 2. `docs/CURRENT_STATE.md`
 3. `docs/PROJECT_MASTER_PLAN.md`
 4. `docs/ARCHITECTURE_AND_DATA.md`
-5. `docs/POLYMARKET_DATA_INTEGRATION.md`
-6. `docs/DATABASE_ACCEPTANCE.md`
-7. `docs/DEVELOPMENT_WORKFLOW.md`
-8. `docs/TROUBLESHOOTING_AND_SUPPORT.md`
-9. `docs/ROADMAP_CAPABILITY_MATRIX.md`
-10. `docs/adr/` 中全部已接受 ADR
-11. GitHub 当前打开的 Issues、最近合并的 PR 和 CI 状态
+5. `docs/API_READ_CONTRACT.md`
+6. `docs/POLYMARKET_DATA_INTEGRATION.md`
+7. `docs/DATABASE_ACCEPTANCE.md`
+8. `docs/DEVELOPMENT_WORKFLOW.md`
+9. `docs/TROUBLESHOOTING_AND_SUPPORT.md`
+10. `docs/ROADMAP_CAPABILITY_MATRIX.md`
+11. `docs/adr/` 中全部已接受 ADR
+12. GitHub 当前打开的 Issues、最近合并的 PR 和 CI 状态
 
 读取完成后，先用不超过十条说明：当前阶段、已完成能力、未完成能力、正在处理的 Issue、主要风险和下一步。不要在未读取仓库前根据旧聊天直接开发。
 
@@ -67,7 +68,7 @@ AI/工程师应负责：
 ## 5. 当前技术结构
 
 - `apps/web`：Next.js 前端；
-- `apps/api`：NestJS API；
+- `apps/api`：NestJS 版本化只读 API 和后续业务接口；
 - `apps/worker`：Provider 同步、CLOB 实时行情、REST 校准、生命周期回查、运行告警、结算与异步任务；
 - `packages/domain`：统一领域模型；
 - `packages/database`：PostgreSQL/Drizzle Schema、价格/生命周期证据、Provider 运行状态和正式迁移；

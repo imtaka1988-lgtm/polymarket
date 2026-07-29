@@ -49,6 +49,12 @@
 - 告警恢复、生命周期幂等、禁止自动结算和轮转防饥饿 PostgreSQL 集成测试；
 - Worker 停机停止新定时任务并等待目录、生命周期、健康检查和实时队列排空；
 - 正式迁移 `0002_harsh_dark_beast.sql` 和 ADR-0006；
+- V1 只读市场列表、详情、Outcome current price 和平台数据状态 API；
+- `(updated_at,id)` Keyset Cursor、公开状态白名单和 1–100 bounded page size；
+- healthy/degraded/unavailable 与保守 `readOnly` 聚合；
+- 十进制价格字符串、稳定错误代码和端到端 Request ID；
+- API PostgreSQL HTTP 集成测试和内部告警字段防泄漏回归测试；
+- `docs/API_READ_CONTRACT.md` 和 ADR-0007；
 - 根目录 `AGENTS.md`；
 - `docs/AI_PROJECT_HANDOFF.md`；
 - `docs/CURRENT_STATE.md`；
@@ -70,11 +76,14 @@
 - Provider 包升级为 0.3.x，M1.3a CLOB WebSocket 客户端基础完成。
 - Provider/Worker 升级为 0.4.x、Database 升级为 0.2.x，M1.3b 实时价格数据闭环完成。
 - Provider/Worker 升级为 0.5.x、Database 升级为 0.3.x，M1.4 Provider 运营后端完成。
+- API 升级为 0.2.x，M1.5 版本化只读 API 完成。
+- 数据库测试跨 Workspace 包串行，避免 API 与 Worker 验收清理互相污染。
 
 ### Known limitations
 
 - CLOB 真实网络长期运行和部署环境恢复演练尚未完成；
-- 版本化只读 API 和管理页面尚未完成；
+- 管理后台和用户端只读页面尚未完成；
+- 生产只读数据库角色、API 缓存和速率限制尚待部署配置；
 - 真实官方 Fixture、长期契约变化监控和大数据性能测试尚未完成；
 
 ## [0.1.0] - 2026-07-29

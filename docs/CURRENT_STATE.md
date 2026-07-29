@@ -2,8 +2,8 @@
 
 > 状态日期：2026-07-29  
 > 项目阶段：M1 Provider 数据闭环  
-> 当前完成：M1.4 Provider 生命周期回查、degraded 状态和可观测性后端
-> 下一工作：前端可依赖的版本化只读 API
+> 当前完成：M1.5 版本化只读市场、价格和平台数据状态 API
+> 下一工作：M1.6 管理后台与只读页面；M1.7 部署环境长期恢复演练
 > 权威任务：GitHub Issue #2  
 > 状态规则：本文件每次功能 PR 必须更新
 
@@ -77,6 +77,13 @@
 - 目录同步 Warning、连续失败、价格缺失/陈旧、长时间断线和队列丢失告警；
 - 生命周期、告警恢复和新鲜度 PostgreSQL 集成测试；
 - 正式迁移 `0002_harsh_dark_beast.sql` 和 ADR-0006。
+- `/api/v1/markets` 稳定 Keyset Cursor、公开状态白名单和 bounded page size；
+- `/api/v1/markets/{id}` 与 `/prices` 本地标准化详情和 current price；
+- `/api/v1/platform/data-status` 的 healthy/degraded/unavailable 与 `readOnly`；
+- V1 稳定 DTO、十进制字符串、Request ID 和错误代码；
+- API 只读 PostgreSQL，不在请求链路调用 Provider，不泄漏原始 payload 或内部告警详情；
+- API PostgreSQL HTTP 集成测试和跨包数据库测试串行隔离；
+- `docs/API_READ_CONTRACT.md` 和 ADR-0007。
 
 ## 3. M1.2 自动验收结果
 
@@ -100,12 +107,11 @@ GitHub Actions 已真实验证：
 
 ## 4. 尚未完成
 
-### 前端开工前剩余
+### 下一施工阶段
 
-- 版本化只读市场列表、详情、价格和平台数据状态 API；
-- 真实网络长期运行与恢复演练；
-- 同步管理后台；
-- 只读市场列表和详情页面。
+- 同步管理后台和审核工作台；
+- 用户端只读市场列表和详情页面；
+- 部署环境真实网络长期运行与恢复演练。
 
 ### M2 预测闭环
 
@@ -124,21 +130,23 @@ GitHub Actions 已真实验证：
 - 外部字段可能变化，必须保存原始响应并维护 Fixture；
 - 不能把 `closed` 直接解释为本地已结算；
 - Provider 运行告警已有耐久后端，尚未提供管理页面；
+- V1 API 已可作为前端数据边界，但尚未配置生产只读数据库角色、缓存和速率限制；
 - 当前不是可公开运营的成品。
 
 ## 6. 完成度口径
 
-M1.4 Provider 运营后端完成后的工程评估：
+M1.5 版本化只读 API 完成后的工程评估：
 
 - Event Keyset 目录同步模块：约 96%；
 - M1.2 数据库迁移与持久化可靠性：约 97%；
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
 - M1.3b CLOB 实时价格数据闭环：约 92%；
 - M1.4 生命周期与可观测性后端：约 90%；
-- 整个 M1 数据闭环：约 84%；
-- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 20%–23%。
+- M1.5 版本化只读 API：约 93%；
+- 整个 M1 数据闭环：约 89%；
+- 整个成熟娱乐平台：仍处于早期基础建设阶段，约 22%–25%。
 
-剩余 Event Keyset 优化主要是：真实官方 Fixture、长期契约监控、大数据性能测试和运行告警。
+剩余 Event Keyset 优化主要是：真实官方 Fixture、长期契约监控、大数据性能测试和外部告警转发。
 
 ## 7. 新接手者下一步
 
@@ -147,4 +155,5 @@ M1.4 Provider 运营后端完成后的工程评估：
 3. 读取 `docs/DATABASE_ACCEPTANCE.md`；
 4. 查看 Issue #2；
 5. 检查最新 main Commit、PR 和 GitHub Actions；
-6. 实现版本化只读 API，不要让前端直接查询 Provider 或数据库内部表。
+6. 前端严格按 `docs/API_READ_CONTRACT.md` 施工，不要直接查询 Provider 或数据库内部表；
+7. 部署到 staging 后执行 M1.7 真实网络长期运行与恢复演练。

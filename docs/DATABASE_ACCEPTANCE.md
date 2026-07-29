@@ -1,6 +1,6 @@
 # 数据库迁移与自动验收规范
 
-> 文档版本：V1.2
+> 文档版本：V1.3
 > 最后更新：2026-07-29  
 > 适用阶段：M1.2 及以后所有数据库改动  
 > 状态：已由 GitHub Actions 验证
@@ -212,6 +212,9 @@ pnpm verify
 
 本地没有 `TEST_DATABASE_URL` 时，数据库集成测试会跳过；CI 中该变量是必填并真实运行。
 
+API 与 Worker 的 PostgreSQL 测试会修改同一组验收表，因此 `pnpm test` 和 `pnpm verify` 的测试阶段
+跨包串行执行。不得为了加速而恢复并行，除非每个包已迁移到完全隔离的测试数据库或 Schema。
+
 ## 9. 数据库变更流程
 
 ```text
@@ -297,6 +300,17 @@ pnpm verify
 - Alert 是否使用稳定 Dedup Key，并以 resolved 保留历史；
 - 价格新鲜度是否只统计本地 `open` Outcome。
 
+### 只读 API PostgreSQL 测试失败
+
+检查：
+
+- Migration 0000–0002 是否已全部执行；
+- 市场分页是否按 `(updated_at DESC, id DESC)`；
+- draft/pending_review 是否被公开状态白名单排除；
+- PostgreSQL `numeric` 是否仍以字符串返回；
+- API 和 Worker 数据库测试是否跨包串行；
+- Provider 告警 message/details 是否误入公开 DTO。
+
 ## 11. 外部求助资料
 
 提供：
@@ -314,7 +328,7 @@ pnpm verify
 
 ## 12. 当前验收结果
 
-PR #4 与 PR #5 的 PostgreSQL CI 已验证：
+PR #4、PR #5、PR #7 与 PR #8 的 PostgreSQL CI 已验证：
 
 - Schema 与正式迁移同步；
 - 初始迁移执行成功；

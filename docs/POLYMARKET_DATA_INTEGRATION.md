@@ -500,9 +500,7 @@ Token 集合定时刷新并替换 Registry。市场不再 open 时自动取消�
 使用公开 `POST https://clob.polymarket.com/books`，请求体为：
 
 ```json
-[
-  { "token_id": "<token_id>" }
-]
+[{ "token_id": "<token_id>" }]
 ```
 
 按最多 500 个 Token 分批，复用超时、429/5xx 重试、指数退避和随机抖动。
@@ -581,7 +579,7 @@ Observation，再保守更新本地状态。`closed=true` 不能直接成为本�
 Runtime State。连续失败、标准化/解析 Warning、缺失或陈旧价格、长时间断线、消息丢弃和写入失败
 使用稳定 Dedup Key 打开告警；恢复后标记 resolved 并保留历史。
 
-未来版本化只读 API 根据这些表聚合 `healthy/degraded` 和 `readOnly`。API 请求不得临时调用
+V1 版本化只读 API 根据这些表聚合 `healthy/degraded/unavailable` 和 `readOnly`。API 请求不得临时调用
 Polymarket，Provider 失败时不得清空最后成功目录或价格。
 
 ### 19.11 当前边界
@@ -590,7 +588,6 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 乱序保护、Leader Lock 和自动测试。M1.4 已完成生命周期回查和耐久告警后端。仍未完成：
 
 - 真实网络长期运行与恢复演练；
-- 版本化只读 API；
 - 管理页面和外部告警渠道。
 
 价格可作为后续只读展示和 Quote 的来源候选，但不能单独作为结算证据。
@@ -654,12 +651,16 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
 - M1.3b CLOB 实时价格数据闭环：约 92%；
 - M1.4 生命周期与可观测性后端：约 90%；
-- 整个 M1 数据闭环：约 84%。
+- M1.5 版本化只读 API：约 93%；
+- 整个 M1 数据闭环：约 89%。
 
-下一阶段是版本化只读 API：
+版本化只读 API 已完成：
 
 1. 市场列表和详情；
 2. Outcome Current Price；
 3. Provider 数据状态、告警和 `readOnly`；
 4. 稳定 Cursor、DTO 和错误契约；
 5. PostgreSQL API 集成测试。
+
+下一阶段是管理后台、用户端只读页面和部署环境长期恢复演练。API 详细契约见
+`docs/API_READ_CONTRACT.md`。

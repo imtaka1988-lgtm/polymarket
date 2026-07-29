@@ -1,6 +1,6 @@
 # 故障排查与外部求助
 
-> 文档版本：V0.5
+> 文档版本：V0.6
 > 最后更新：2026-07-29
 
 ## 1. 先保护数据，再找原因
@@ -33,6 +33,23 @@
 ### API 500
 
 检查 Request ID、API 日志、数据库连接、环境变量、最近迁移和输入校验。不要公开完整堆栈和秘密。
+
+V1 API 错误体必须包含稳定 `error.code` 和与响应头一致的 `x-request-id`。若客户端收到
+`INTERNAL_ERROR`，用 Request ID 查结构化日志；不要把服务端堆栈、`last_error` 或告警详情复制到页面。
+
+### 市场列表分页重复、缺失或 400
+
+- Cursor 必须原样使用 `pagination.nextCursor`，不要解析或拼接；
+- `limit` 只能是 1–100；
+- `status` 只能是公开状态、逗号分隔公开状态或 `all`；
+- 数据更新可能改变新一轮列表排序，刷新时从第一页重新开始；
+- `INVALID_CURSOR` 时丢弃本地旧 Cursor 并重新读取第一页。
+
+### 平台显示 degraded/read-only
+
+读取 `/api/v1/platform/data-status` 的 component 和公开 alert code，再查询
+`provider_runtime_states`、`provider_alerts` 的内部详情。`unavailable` 表示尚无运行状态，
+不能当作 healthy。排障期间保留最后成功数据，不要让 API 临时直连 Provider。
 
 ### CI：Schema 与迁移不同步
 
