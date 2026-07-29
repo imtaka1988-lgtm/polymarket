@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BadRequestException } from '@nestjs/common';
 import { decodeMarketCursor, encodeMarketCursor, parseMarketListQuery } from './api-contract';
+import { createApiApplication } from './application';
+import { MarketReadStore } from './market-read.store';
+import { MarketsController } from './markets.controller';
+import { PlatformController } from './platform.controller';
 
 test('v1 market cursor round-trips without losing the stable sort tuple', () => {
   const cursor = {
@@ -64,6 +68,17 @@ test('market list query applies bounded defaults and public status validation', 
   );
 });
 
+test('Nest wires the read store into controllers when tests run through tsx', async () => {
+  const app = await createApiApplication({ logger: false });
+  await app.init();
+  try {
+    assert.ok(readStore(app.get(MarketsController)) instanceof MarketReadStore);
+    assert.ok(readStore(app.get(PlatformController)) instanceof MarketReadStore);
+  } finally {
+    await app.close();
+  }
+});
+
 function assertApiProblem(action: () => unknown, expectedCode: string): void {
   assert.throws(action, (error: unknown) => {
     if (!(error instanceof BadRequestException)) return false;
@@ -75,4 +90,8 @@ function assertApiProblem(action: () => unknown, expectedCode: string): void {
       response.code === expectedCode
     );
   });
+}
+
+function readStore(value: object): unknown {
+  return (value as { store?: unknown }).store;
 }

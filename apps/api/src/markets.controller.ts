@@ -1,11 +1,11 @@
-import { Controller, Get, NotFoundException, Param, Query, Req } from '@nestjs/common';
+import { Controller, Get, Inject, NotFoundException, Param, Query, Req } from '@nestjs/common';
 import type { ApiRequest } from './request-context';
 import { API_VERSION, assertUuid, parseMarketListQuery } from './api-contract';
 import { MarketReadStore } from './market-read.store';
 
 @Controller('markets')
 export class MarketsController {
-  constructor(private readonly store: MarketReadStore) {}
+  constructor(@Inject(MarketReadStore) private readonly store: MarketReadStore) {}
 
   @Get()
   async listMarkets(

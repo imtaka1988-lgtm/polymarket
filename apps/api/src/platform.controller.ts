@@ -1,11 +1,11 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Inject, Req } from '@nestjs/common';
 import { API_VERSION } from './api-contract';
 import { MarketReadStore } from './market-read.store';
 import type { ApiRequest } from './request-context';
 
 @Controller('platform')
 export class PlatformController {
-  constructor(private readonly store: MarketReadStore) {}
+  constructor(@Inject(MarketReadStore) private readonly store: MarketReadStore) {}
 
   @Get('data-status')
   async getDataStatus(@Req() request: ApiRequest): Promise<object> {
