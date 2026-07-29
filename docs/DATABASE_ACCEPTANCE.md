@@ -240,7 +240,7 @@ pnpm verify
 
 ## 12. 当前验收结果
 
-PR #4 与后续可靠性加固 PR 的 PostgreSQL CI 已验证：
+PR #4 与 PR #5 的 PostgreSQL CI 已验证：
 
 - Schema 与正式迁移同步；
 - 初始迁移执行成功；
