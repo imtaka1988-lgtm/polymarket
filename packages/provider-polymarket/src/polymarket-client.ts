@@ -1,4 +1,5 @@
 import { PolymarketHttpError, PolymarketPayloadError } from './errors.js';
+import { parseMarketLifecycleSnapshot } from './market-lifecycle.js';
 import { isPolymarketEventRaw, isRecord } from './parsers.js';
 import type {
   EventsKeysetPage,
@@ -6,6 +7,7 @@ import type {
   ListEventsOptions,
   PolymarketClientOptions,
   PolymarketEventRaw,
+  PolymarketMarketLifecycleSnapshot,
   RetryPolicy,
 } from './types.js';
 
@@ -24,7 +26,9 @@ export class PolymarketClient {
 
   constructor(private readonly options: PolymarketClientOptions) {
     this.fetchFn = options.fetchFn ?? fetch;
-    this.sleep = options.sleep ?? ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.sleep =
+      options.sleep ??
+      ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     this.now = options.now ?? (() => new Date());
     this.retry = {
       maxAttempts: options.retry?.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
@@ -42,7 +46,11 @@ export class PolymarketClient {
     if (options.closed !== undefined) url.searchParams.set('closed', String(options.closed));
 
     const body = await this.requestJson(url);
-    if (!Array.isArray(body)) throw new PolymarketPayloadError('Gamma /events returned a non-array payload', url.toString());
+    if (!Array.isArray(body))
+      throw new PolymarketPayloadError(
+        'Gamma /events returned a non-array payload',
+        url.toString(),
+      );
     return body.filter(isPolymarketEventRaw);
   }
 
@@ -52,7 +60,10 @@ export class PolymarketClient {
     const body = await this.requestJson(url);
 
     if (!isRecord(body) || !Array.isArray(body.events)) {
-      throw new PolymarketPayloadError('Gamma /events/keyset payload did not contain an events array', url.toString());
+      throw new PolymarketPayloadError(
+        'Gamma /events/keyset payload did not contain an events array',
+        url.toString(),
+      );
     }
 
     const invalidCount = body.events.filter((event) => !isPolymarketEventRaw(event)).length;
@@ -64,17 +75,31 @@ export class PolymarketClient {
     }
 
     if (body.next_cursor !== undefined && typeof body.next_cursor !== 'string') {
-      throw new PolymarketPayloadError('Gamma /events/keyset next_cursor was not a string', url.toString());
+      throw new PolymarketPayloadError(
+        'Gamma /events/keyset next_cursor was not a string',
+        url.toString(),
+      );
     }
 
     return {
       events: body.events as PolymarketEventRaw[],
-      nextCursor: typeof body.next_cursor === 'string' && body.next_cursor.length > 0 ? body.next_cursor : null,
+      nextCursor:
+        typeof body.next_cursor === 'string' && body.next_cursor.length > 0
+          ? body.next_cursor
+          : null,
       requestCursor: options.afterCursor ?? null,
       requestUrl: url.toString(),
       fetchedAt: this.now().toISOString(),
       rawPayload: body,
     };
+  }
+
+  async getMarketLifecycle(providerMarketId: string): Promise<PolymarketMarketLifecycleSnapshot> {
+    const normalizedId = providerMarketId.trim();
+    if (normalizedId.length === 0) throw new RangeError('providerMarketId must not be empty');
+    const url = new URL(`/markets/${encodeURIComponent(normalizedId)}`, this.options.gammaBaseUrl);
+    const body = await this.requestJson(url);
+    return parseMarketLifecycleSnapshot(body, url.toString());
   }
 
   private async requestJson(url: URL): Promise<unknown> {
@@ -104,7 +129,10 @@ export class PolymarketClient {
         try {
           return JSON.parse(responseText) as unknown;
         } catch {
-          throw new PolymarketPayloadError('Polymarket Gamma returned invalid JSON', url.toString());
+          throw new PolymarketPayloadError(
+            'Polymarket Gamma returned invalid JSON',
+            url.toString(),
+          );
         }
       } catch (error) {
         lastError = error;
@@ -115,14 +143,17 @@ export class PolymarketClient {
       }
     }
 
-    throw lastError instanceof Error ? lastError : new Error('Polymarket request failed without an error object');
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Polymarket request failed without an error object');
   }
 }
 
 export function buildEventsKeysetUrl(baseUrl: string, options: ListEventsKeysetOptions): URL {
   const url = new URL('/events/keyset', baseUrl);
   setNumber(url, 'limit', options.limit ?? 100);
-  if (options.order !== undefined && options.order.length > 0) url.searchParams.set('order', options.order.join(','));
+  if (options.order !== undefined && options.order.length > 0)
+    url.searchParams.set('order', options.order.join(','));
   setBoolean(url, 'ascending', options.ascending);
   setString(url, 'after_cursor', options.afterCursor);
   appendMany(url, 'id', options.ids);
@@ -166,11 +197,13 @@ export function buildEventsKeysetUrl(baseUrl: string, options: ListEventsKeysetO
 
 function validateKeysetOptions(options: ListEventsKeysetOptions): void {
   const limit = options.limit ?? 100;
-  if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new RangeError('events keyset limit must be an integer from 1 to 500');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500)
+    throw new RangeError('events keyset limit must be an integer from 1 to 500');
 
   const included = new Set(options.tagIds ?? []);
   const overlap = (options.excludeTagIds ?? []).filter((tagId) => included.has(tagId));
-  if (overlap.length > 0) throw new RangeError(`tagIds and excludeTagIds overlap: ${overlap.join(',')}`);
+  if (overlap.length > 0)
+    throw new RangeError(`tagIds and excludeTagIds overlap: ${overlap.join(',')}`);
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -181,9 +214,11 @@ function getRetryDelay(response: Response, attempt: number, retry: RetryPolicy):
   const retryAfter = response.headers.get('retry-after');
   if (retryAfter !== null) {
     const seconds = Number(retryAfter);
-    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1_000, retry.maxDelayMs);
+    if (Number.isFinite(seconds) && seconds >= 0)
+      return Math.min(seconds * 1_000, retry.maxDelayMs);
     const dateValue = Date.parse(retryAfter);
-    if (!Number.isNaN(dateValue)) return Math.min(Math.max(dateValue - Date.now(), 0), retry.maxDelayMs);
+    if (!Number.isNaN(dateValue))
+      return Math.min(Math.max(dateValue - Date.now(), 0), retry.maxDelayMs);
   }
   return calculateBackoff(attempt, retry);
 }

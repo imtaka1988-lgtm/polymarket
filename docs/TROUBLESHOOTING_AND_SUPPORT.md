@@ -1,6 +1,6 @@
 # 故障排查与外部求助
 
-> 文档版本：V0.4
+> 文档版本：V0.5
 > 最后更新：2026-07-29
 
 ## 1. 先保护数据，再找原因
@@ -173,6 +173,46 @@ Gamma Keyset 只负责目录和 Token ID；正式价格来自 CLOB REST/WebSocke
 检查专用 Lock Pool 的数据库连接、网络中断和 `market_realtime_lock_health_check_failed`。
 实时锁必须使用独立 Session，不能复用 Store Pool。Session 失效时当前实例应先停止
 WebSocket/REST，再重新竞选；不要关闭锁或让每个副本都连接行情。
+
+### 市场已在 Polymarket 关闭但本地仍为 open
+
+依次检查：
+
+1. `POLYMARKET_LIFECYCLE_ENABLED=true`；
+2. 是否已执行迁移 `0002_harsh_dark_beast.sql`；
+3. `market_lifecycle_check_completed` 的 candidates/checked/failed；
+4. 是否有另一个 Worker 持有 `polymarket:market-lifecycle:v1`；
+5. 该市场是否在 lookahead 范围内，或无关闭时间且导入不足 24 小时；
+6. 最近 Observation 是否仍在 recheck 间隔内；
+7. Gamma `GET /markets/{id}` 是否返回 `closed=true`。
+
+不要手工把市场改成 resolved。回查只能保守更新 open/suspended/closed/archived。
+
+### Resolution Candidate 没有赢家
+
+这是安全行为，不一定是错误。系统只在关闭市场中恰好一个 Outcome 价格为 1、其余全部为 0，
+且赢家 Token 能唯一匹配本地 Outcome 时记录候选赢家。查看 Observation 原始证据、Outcome 数组、
+价格数组、Token 数组和 `provider_resolution_status`，交给人工复核；不要按价格最高者猜测。
+
+### Provider 状态显示 degraded
+
+查询 `provider_runtime_states` 和对应打开的 `provider_alerts`，按 component 排查：
+
+- `catalog_sync`：连续失败或标准化 Warning；
+- `market_lifecycle`：Gamma 单市场回查失败；
+- `realtime_rest`：CLOB REST 校准失败；
+- `market_data`：open Outcome 缺少价格或超过新鲜度阈值；
+- `market_websocket`：长时间断线或解析 Warning；
+- `realtime_queue`：消息丢弃或持久化失败；
+- `realtime_leadership`：锁 Session 丢失。
+
+恢复后系统会把告警标记为 `resolved` 并保留历史。不要删除 Alert 让状态看起来正常。
+
+### 告警长期不恢复
+
+先确认对应组件确实出现过一次成功检查。连续失败告警需要组件成功；价格陈旧告警需要所有 open
+Outcome 具有阈值内的 current price；断线告警需要 WebSocket 回到 open。若事实已恢复但状态未变，
+检查 Worker 健康检查定时器、数据库写入错误和环境阈值。
 
 ### Market WebSocket 没有建立连接
 

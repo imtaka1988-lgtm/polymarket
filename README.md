@@ -2,8 +2,8 @@
 
 > **项目形态**：可扩展的娱乐型事件预测与游戏化互动平台  
 > **当前阶段**：M1 Provider 数据闭环  
-> **已完成阶段**：M1.3b CLOB 实时价格数据闭环
-> **下一阶段**：M1.4 关闭/结算回查、降级与可观测性
+> **已完成阶段**：M1.4 Provider 生命周期回查、降级与可观测性后端
+> **下一阶段**：前端可依赖的版本化只读 API
 > **核心边界**：只使用无现金价值、不可购买、不可提现、不可转让的免费虚拟积分。
 
 本项目以 Polymarket 公开市场数据作为首个外部来源。平台不依赖 Polymarket 用户账户、钱包或交易系统；所有模拟预测、积分、持仓与结算由本地系统管理。
@@ -25,9 +25,9 @@
 
 - `apps/web`：Next.js 用户端；
 - `apps/api`：NestJS 业务 API；
-- `apps/worker`：Provider Keyset 同步与未来实时行情接线、异步任务；
+- `apps/worker`：Provider Keyset 同步、实时行情、生命周期回查、健康监控与异步任务；
 - `packages/domain`：统一市场、状态和领域事件；
-- `packages/database`：PostgreSQL/Drizzle Schema 和正式迁移；
+- `packages/database`：PostgreSQL/Drizzle Schema、Provider 运行状态和正式迁移；
 - `packages/provider-polymarket`：Keyset/CLOB 客户端、Token Registry、WebSocket 生命周期、重试、解析、标准化和同步编排；
 - PostgreSQL Cursor 检查点、同步运行、原始页、原始 Event/Market 和标准 Market/Outcome；
 - 页面数据与 Cursor 原子事务；
@@ -36,6 +36,8 @@
 - CLOB Market WebSocket 动态订阅、心跳、重连、完整重订阅和契约测试；
 - PostgreSQL Token Source、REST `/books` 初始快照和周期校准；
 - 不可变价格快照、乱序保护的 current price read model 和实时 Leader Lock；
+- 生命周期不可变观察、待人工复核 Resolution Candidate 和独立回查锁；
+- 耐久 Provider Runtime State 与可恢复告警；
 - GitHub Actions PostgreSQL 16、迁移漂移检查、自动迁移和集成测试；
 - 不可变虚拟积分账本、结算版本、Outbox、审计和功能开关基线；
 - Doctor、Health、Verify、Support Bundle；
@@ -91,8 +93,8 @@ pnpm db:migrate
 
 ## 当前不是成品
 
-当前完成了工程底座、Event 目录同步、数据库可靠性验收和 CLOB 实时价格数据闭环。
-尚未完成关闭/结算回查、降级与告警、前端只读 API、完整用户系统、模拟预测闭环和管理后台。
+当前完成了工程底座、Event 目录同步、数据库可靠性验收、CLOB 实时价格闭环和 M1.4 运营后端。
+尚未完成版本化只读 API、真实网络长期演练、完整用户系统、模拟预测闭环和管理页面。
 详细状态以 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) 和 Issue #2 为准。
 
 ## 安全底线

@@ -15,6 +15,13 @@
       "when": 1785338956827,
       "tag": "0001_silly_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785341031437,
+      "tag": "0002_harsh_dark_beast",
+      "breakpoints": true
     }
   ]
 }

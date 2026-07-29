@@ -41,6 +41,14 @@
 - 实时 Worker Session Advisory Leader Lock 和失锁重试；
 - 价格快照幂等、未知 Token、乱序事件和 Token Source PostgreSQL 集成测试；
 - 正式迁移 `0001_silly_siren.sql` 和 ADR-0005；
+- Gamma `GET /markets/{id}` 生命周期客户端、官方状态契约和严格 Outcome 证据解析；
+- 近期关闭、已关闭和待解析市场的轮转回查与独立 Advisory Lock；
+- 不可变 `market_lifecycle_observations` 和待人工复核 `market_resolution_candidates`；
+- `provider_runtime_states` 与 `provider_alerts` 耐久运行状态；
+- 连续失败、目录 Warning、价格缺失/陈旧、长时间断线、解析 Warning 和队列事件丢失告警；
+- 告警恢复、生命周期幂等、禁止自动结算和轮转防饥饿 PostgreSQL 集成测试；
+- Worker 停机停止新定时任务并等待目录、生命周期、健康检查和实时队列排空；
+- 正式迁移 `0002_harsh_dark_beast.sql` 和 ADR-0006；
 - 根目录 `AGENTS.md`；
 - `docs/AI_PROJECT_HANDOFF.md`；
 - `docs/CURRENT_STATE.md`；
@@ -61,13 +69,13 @@
 - 项目阶段升级为 M1.2 数据库迁移与可靠性基线完成；
 - Provider 包升级为 0.3.x，M1.3a CLOB WebSocket 客户端基础完成。
 - Provider/Worker 升级为 0.4.x、Database 升级为 0.2.x，M1.3b 实时价格数据闭环完成。
+- Provider/Worker 升级为 0.5.x、Database 升级为 0.3.x，M1.4 Provider 运营后端完成。
 
 ### Known limitations
 
-- CLOB 真实网络长期运行、延迟/积压告警和恢复演练尚未完成；
-- 关闭/结算回查和管理后台尚未完成；
+- CLOB 真实网络长期运行和部署环境恢复演练尚未完成；
+- 版本化只读 API 和管理页面尚未完成；
 - 真实官方 Fixture、长期契约变化监控和大数据性能测试尚未完成；
-- 数据延迟和连续失败告警尚未完成。
 
 ## [0.1.0] - 2026-07-29
 

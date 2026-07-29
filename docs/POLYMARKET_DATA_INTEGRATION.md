@@ -1,10 +1,10 @@
 # Polymarket 数据接入与同步规范
 
-> 文档版本：V0.5
-> 适用代码：`@forecast/provider-polymarket` 0.4.x、`@forecast/worker` 0.4.x
+> 文档版本：V0.6
+> 适用代码：`@forecast/provider-polymarket` 0.5.x、`@forecast/worker` 0.5.x
 > 最后更新：2026-07-29  
 > 负责人：项目负责人 + AI/Codex  
-> 状态：Event Keyset、数据库可靠性和 CLOB 实时价格数据闭环已验证；关闭/结算回查待建设
+> 状态：Event Keyset、CLOB 实时价格、生命周期回查与耐久降级状态已验证
 
 ## 1. 文档目的
 
@@ -99,6 +99,7 @@ packages/provider-polymarket/src/
 ├── events-keyset-sync.ts
 ├── clob-rest-client.ts
 ├── decimal.ts
+├── market-lifecycle.ts
 ├── market-token-subscription-registry.ts
 ├── market-websocket-contract.ts
 ├── market-websocket.ts
@@ -112,14 +113,20 @@ apps/worker/src/
 ├── polymarket-realtime-worker.ts
 ├── postgres-market-price-store.ts
 ├── postgres-market-price-store.integration.test.ts
+├── polymarket-lifecycle-worker.ts
+├── postgres-provider-operations-store.ts
+├── postgres-provider-operations-store.integration.test.ts
 ├── postgres-advisory-lock.ts
 └── postgres-advisory-lock.integration.test.ts
 
 packages/database/
 ├── src/schema.ts
 ├── src/provider-sync-schema.ts
+├── src/provider-operations-schema.ts
 └── drizzle/
     ├── 0000_initial_platform.sql
+    ├── 0001_silly_siren.sql
+    ├── 0002_harsh_dark_beast.sql
     └── meta/
 ```
 
@@ -157,6 +164,16 @@ POLYMARKET_CLOB_REST_BATCH_SIZE=500
 POLYMARKET_TOKEN_REFRESH_INTERVAL_MS=60000
 POLYMARKET_REST_RECONCILIATION_INTERVAL_MS=60000
 POLYMARKET_WEBSOCKET_MAX_QUEUE_SIZE=10000
+POLYMARKET_LIFECYCLE_ENABLED=true
+POLYMARKET_LIFECYCLE_INTERVAL_MS=300000
+POLYMARKET_LIFECYCLE_BATCH_SIZE=100
+POLYMARKET_LIFECYCLE_LOOKAHEAD_HOURS=24
+POLYMARKET_LIFECYCLE_RECHECK_INTERVAL_MS=900000
+POLYMARKET_HEALTH_CHECK_INTERVAL_MS=60000
+POLYMARKET_PRICE_STALE_THRESHOLD_MS=300000
+POLYMARKET_FAILURE_ALERT_THRESHOLD=3
+POLYMARKET_PARSE_WARNING_ALERT_THRESHOLD=1
+POLYMARKET_WEBSOCKET_DISCONNECT_ALERT_MS=120000
 POLYMARKET_SYNC_INTERVAL_MS=60000
 POLYMARKET_REQUEST_TIMEOUT_MS=10000
 POLYMARKET_SYNC_PAGE_SIZE=100
@@ -192,6 +209,13 @@ WORKER_DATABASE_POOL_SIZE=5
 
 - `market_price_snapshots`：不可变 REST/WebSocket 价格更新、来源事件键和标准化证据；
 - `market_current_prices`：按 Outcome 的 current bid/ask/midpoint/last trade 读取模型。
+
+### 生命周期与运营层
+
+- `market_lifecycle_observations`：不可变 Market 状态回查证据；
+- `market_resolution_candidates`：默认 `pending_review` 的解析候选；
+- `provider_runtime_states`：组件状态、连续失败、最后成功/失败和指标；
+- `provider_alerts`：打开/恢复告警及稳定 Dedup Key。
 
 正式迁移由 Drizzle 生成并提交在 `packages/database/drizzle/`。CI 会检查 Schema 与迁移无漂移并真实执行迁移。
 
@@ -524,15 +548,50 @@ polymarket:market-realtime:v1
 WebSocket 事件进入有界串行队列，默认最多 10,000 条，避免突发消息耗尽数据库连接。
 队列溢出记录 `market_websocket_event_dropped`，后续由 REST 校准恢复。
 
-### 19.9 当前边界
+### 19.9 生命周期回查和保守结算边界
+
+Worker 轮转选择近期到期、已关闭和待解析市场，通过：
+
+```text
+GET https://gamma-api.polymarket.com/markets/{id}
+```
+
+读取 `active`、`closed`、`archived`、`acceptingOrders`、`closedTime`、
+`umaResolutionStatus`、`outcomes`、`outcomePrices` 和 `clobTokenIds`。
+
+官方依据：
+
+- <https://docs.polymarket.com/api-reference/markets/get-market-by-id>
+- <https://docs.polymarket.com/market-data/market-details>
+
+回查使用 `polymarket:market-lifecycle:v1` 独立 Session Lock。每个结果先追加不可变
+Observation，再保守更新本地状态。`closed=true` 不能直接成为本地 `resolved`：
+
+- 不设置 `resolved_at`；
+- 不修改 `is_winning_outcome`；
+- 不创建 Settlement；
+- 不写 Ledger。
+
+关闭市场会创建 `pending_review` Candidate。只有恰好一个 Outcome 价格为 1、其余全部为 0，
+且 Token 唯一匹配本地 Outcome 时，Candidate 才携带赢家 ID。
+
+### 19.10 耐久降级和告警
+
+目录同步、生命周期、REST 校准、实时持久化、价格新鲜度、WebSocket 和队列分别维护
+Runtime State。连续失败、标准化/解析 Warning、缺失或陈旧价格、长时间断线、消息丢弃和写入失败
+使用稳定 Dedup Key 打开告警；恢复后标记 resolved 并保留历史。
+
+未来版本化只读 API 根据这些表聚合 `healthy/degraded` 和 `readOnly`。API 请求不得临时调用
+Polymarket，Provider 失败时不得清空最后成功目录或价格。
+
+### 19.11 当前边界
 
 M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照、current read model、
-乱序保护、Leader Lock 和自动测试。仍未完成：
+乱序保护、Leader Lock 和自动测试。M1.4 已完成生命周期回查和耐久告警后端。仍未完成：
 
-- 数据新鲜度、连续断线、队列和连续失败生产告警；
 - 真实网络长期运行与恢复演练；
-- 关闭/结算市场滚动回查；
-- 前端和 Quote API。
+- 版本化只读 API；
+- 管理页面和外部告警渠道。
 
 价格可作为后续只读展示和 Quote 的来源候选，但不能单独作为结算证据。
 
@@ -570,6 +629,13 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 - 乱序事件不回退 current 字段；
 - REST/WebSocket 统一写入和启动顺序；
 - 实时 Leader Lock 健康检查。
+- Gamma 单市场生命周期官方契约与严格数组长度验证；
+- 生命周期批次继续处理单项失败；
+- 生命周期 Observation 幂等和回查轮转；
+- `closed` 不自动设置 resolved、赢家、Settlement 或 Ledger；
+- Resolution Candidate 默认人工复核；
+- 连续失败、Warning、价格陈旧和断线告警打开/恢复；
+- Provider Runtime State 耐久化。
 
 仍需补充：
 
@@ -577,7 +643,7 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 - 长期契约变化检测；
 - 大数据量性能测试；
 - 真实网络长连接和恢复演练；
-- 生产指标导出与告警。
+- 外部告警渠道转发。
 
 ## 21. 当前完成度与下一步
 
@@ -587,12 +653,13 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 - 数据库迁移和持久化可靠性：约 97%；
 - M1.3a CLOB WebSocket 客户端基础：约 90%；
 - M1.3b CLOB 实时价格数据闭环：约 92%；
-- 整个 M1 数据闭环：约 74%。
+- M1.4 生命周期与可观测性后端：约 90%；
+- 整个 M1 数据闭环：约 84%。
 
-下一阶段是 M1.4：
+下一阶段是版本化只读 API：
 
-1. 关闭与结算市场滚动回查；
-2. degraded/只读状态；
-3. 数据新鲜度、积压、断线和连续失败告警；
-4. 真实网络恢复演练；
-5. 前端可依赖的版本化只读 API。
+1. 市场列表和详情；
+2. Outcome Current Price；
+3. Provider 数据状态、告警和 `readOnly`；
+4. 稳定 Cursor、DTO 和错误契约；
+5. PostgreSQL API 集成测试。
