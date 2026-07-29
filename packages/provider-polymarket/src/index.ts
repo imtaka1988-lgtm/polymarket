@@ -1,1 +1,1 @@
-export * from './polymarket-client';
+export * from './polymarket-client.js';
