@@ -4,6 +4,9 @@
 - 日期：2026-07-29
 - 决策人：项目负责人 + AI/Codex
 
+> 后续状态（2026-07-30）：本 ADR 记录 M1.3a 接受时的客户端基础。ADR-0005 已完成
+> PostgreSQL Token Source、REST 校准和价格持久化；ADR-0006 已完成耐久运行状态和告警。
+
 ## 背景
 
 Gamma Event Keyset 负责事件目录、规则和 Outcome Token ID，但目录响应中的价格字段不能作为长期实时行情。
@@ -30,7 +33,7 @@ Gamma Event Keyset 负责事件目录、规则和 Outcome Token ID，但目录�
 10. 未识别事件保留事件类型并产生可观测 Warning，不因新事件类型让连接崩溃；
 11. WebSocket 不是唯一行情真相。REST 初始快照、周期对账和价格持久化属于 M1.3 后续切片。
 
-## 当前实现
+## 本 ADR 接受时的实现
 
 - `market-token-subscription-registry.ts`：Token 集合、去重、替换和差异；
 - `market-websocket.ts`：连接、心跳、动态订阅、重连、完整重订阅和内存指标；
@@ -50,8 +53,9 @@ Gamma Event Keyset 负责事件目录、规则和 Outcome Token ID，但目录�
 
 - 进程重启后 Registry 需要由数据库 Token Source 重建；
 - WebSocket 消息可能丢失，因此必须建设 REST 初始快照和周期对账；
-- 当前指标为进程内快照，后续仍需接入监控和告警系统；
-- 当前切片不写入 `market_price_snapshots`，不能作为报价或结算依据。
+- 本 ADR 接受时的指标仅为进程内快照；后续耐久状态和告警已由 ADR-0006 实现；
+- 本 ADR 对应的 M1.3a 切片不写入 `market_price_snapshots`；后续价格持久化已由 ADR-0005 实现，
+  价格仍不能单独作为结算依据。
 
 ## 替代方案
 
