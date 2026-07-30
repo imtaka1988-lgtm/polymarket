@@ -22,9 +22,14 @@
 → 测试
 → 更新文档
 → Pull Request
-→ Staging验收
+→ CI
 → 合并
-→ 发布
+→ 部署 Staging
+→ Staging 验收
+→ 发布验收
 ```
+
+工程切片通过 CI 后可以合并；Staging、容量、恢复和灰度属于部署/发布门槛。没有部署环境时，
+不得把基础设施 PR 写成“已生产验收”，也不得因 M1.7 尚未执行而否认已经通过的工程验收。
 
 详细流程见 `docs/DEVELOPMENT_WORKFLOW.md`。
