@@ -93,6 +93,9 @@
 - API 单条 PostgreSQL statement timeout；
 - 兼容 `/health`、独立 `/health/live` 和真实数据库 `/health/ready`；
 - `api_request_completed` 结构化 Request ID、状态和耗时日志，慢请求/5xx 为 warning。
+- 文档接管入口已统一指向 M1.6，历史 ADR 已标注后续实现状态；
+- 工程 PR 合并、Staging 部署和公开上线三类验收门槛已明确分离；
+- Redis 当前仅为预留基础设施，不属于 M1 读路径或 Provider 数据真相。
 
 ## 3. M1.2 自动验收结果
 
@@ -135,7 +138,7 @@ GitHub Actions 已真实验证：
 
 ## 5. 当前已知风险
 
-- Keyset 推荐排序 `updatedAt,id` 仍需要真实官方长期 Fixture 和契约验证；
+- Keyset 推荐排序 `updatedAt,id` 仍需要脱敏真实网络 Event/Gamma 样本扩充和长期契约验证；
 - WebSocket、REST 和耐久告警已形成数据闭环，但真实网络长期恢复演练仍需部署环境；
 - 外部字段可能变化，必须保存原始响应并维护 Fixture；
 - 不能把 `closed` 直接解释为本地已结算；
@@ -157,7 +160,8 @@ M1.5 版本化只读 API 完成后的工程评估：
 - 整个 M1 数据闭环：约 90%；
 - 整个成熟娱乐平台：仍处于早期基础建设阶段，约 22%–25%。
 
-剩余 Event Keyset 与运行优化主要是：真实官方 Fixture、长期契约监控、staging 容量压测和外部告警转发。
+剩余 Event Keyset 与运行优化主要是：脱敏真实网络 Event/Gamma 样本扩充、长期契约监控、
+staging 百万级容量压测和外部告警转发。CLOB 与生命周期官方示例契约 Fixture 已存在。
 
 ## 7. 新接手者下一步
 
