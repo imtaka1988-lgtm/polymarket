@@ -69,6 +69,11 @@
 
 ### Changed
 
+- 文档接管入口从已完成的 M1.3 修正为当前 M1.6，并同步历史 ADR 的后续实现状态；
+- PostgreSQL Token Source、官方 Fixture 和性能验收措辞与当前实现对齐；
+- 区分工程 PR 合并、Staging 部署和公开上线验收门槛；
+- README 初次搭建流程不再要求普通使用者运行 `pnpm db:generate`；
+- 明确 Redis 当前仅为预留基础设施，尚未进入 M1 读路径或 Provider 数据真相；
 - Worker 从 Offset 首页面连通性测试升级为可恢复 Keyset 同步；
 - Worker 从单进程防重入升级为进程内锁加 PostgreSQL Advisory Lock，锁连接与业务 Store 连接池隔离；
 - 页面累计计数只在数据库事务提交成功后推进；
@@ -94,7 +99,8 @@
 - CLOB 真实网络长期运行和部署环境恢复演练尚未完成；
 - 管理后台和用户端只读页面尚未完成；
 - 生产只读数据库角色、API 缓存和速率限制尚待部署配置；
-- 真实官方 Fixture、长期契约变化监控和 staging 百万级容量压测尚未完成；
+- 脱敏真实网络 Event/Gamma 样本扩充、长期契约变化监控和 staging 百万级容量压测尚未完成；
+  CLOB 与生命周期官方示例契约 Fixture 已存在；
 
 ## [0.1.0] - 2026-07-29
 

@@ -1,23 +1,28 @@
 # 系统架构、数据与核心规则
 
-> 文档版本：V0.6
+> 文档版本：V0.7
 > 最后更新：2026-07-30
 
 ## 1. 架构选择
 
-采用 pnpm Monorepo、模块化单体、Web/API/Worker 独立进程、PostgreSQL 业务真相、Redis 缓存与任务、Transactional Outbox、Provider Adapter。暂不采用微服务和完整 Event Sourcing。
+采用 pnpm Monorepo、模块化单体、Web/API/Worker 独立进程、PostgreSQL 业务真相、Transactional
+Outbox 数据模型和 Provider Adapter。Redis 容器与环境变量已作为后续缓存和任务基础设施预留，
+当前 M1 读路径、Provider 检查点和价格真相均不依赖 Redis。暂不采用微服务和完整 Event Sourcing。
 
 理由：两人可维护，同时保留拆分能力。
 
 ## 2. 运行组件
 
 ```text
-浏览器 → Next.js Web → NestJS API → PostgreSQL/Redis
+浏览器 → Next.js Web → NestJS API → PostgreSQL
                                ↑
-Worker（Provider同步、WebSocket、Outbox、结算、通知、数据保留）
+Worker（当前：Provider同步、WebSocket、回查、监控；后续：Outbox、结算、通知、数据保留）
                                ↑
 Polymarket / Future Providers
 ```
+
+Redis 当前只存在于本地基础设施和环境自检中；正式接入缓存或任务前必须新增实现、失效策略、
+故障降级、自动测试和对应 ADR，不能把 Redis 变成不可恢复的业务真相。
 
 ## 3. 模块边界
 
@@ -296,7 +301,7 @@ HTTP 状态和耗时的结构化日志，慢请求与 5xx 升级为 warning，�
 ## 16. 当前已知架构缺口
 
 - CLOB WebSocket、Token Source、REST 校准和价格写入已实现；
-- 真实官方 Fixture 和长期契约监控尚未实现；
+- CLOB 与生命周期官方示例契约 Fixture 已实现；仍缺少脱敏真实网络 Event/Gamma 样本扩充和长期契约监控；
 - 管理后台尚不能查看同步运行和 Warning；
 - 版本化只读 API、查询索引、statement timeout、健康检查分层和耗时日志已实现；
 - 生产只读数据库角色、缓存和速率限制仍待部署阶段配置；

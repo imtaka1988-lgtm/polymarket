@@ -4,7 +4,9 @@
 - 日期：2026-07-29
 - 决策人：项目负责人 + AI/Codex
 
-> 后续状态：ADR-0004 已落地 CLOB Market WebSocket 客户端基础；REST 对账与价格持久化仍待 M1.3b 完成。
+> 后续状态（2026-07-30）：ADR-0004 已落地 CLOB Market WebSocket 客户端基础；ADR-0005
+> 已落地 PostgreSQL Token Source、REST 对账、价格快照与 current read model；ADR-0006 已落地
+> 生命周期回查和耐久降级状态。
 
 ## 背景
 
