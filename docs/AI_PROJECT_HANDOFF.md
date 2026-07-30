@@ -1,6 +1,6 @@
 # AI / 外部工程师项目接管说明
 
-> 文档版本：V1.3
+> 文档版本：V1.4
 > 最后更新：2026-07-30
 > 权威入口：根目录 `AGENTS.md`  
 > 适用对象：新聊天窗口、ChatGPT Work、Codex、外部工程师、后续维护者
@@ -85,7 +85,7 @@ Next.js Web (`apps/web`)
   ↓
 NestJS API (`apps/api`)
   ↓
-PostgreSQL + Redis
+PostgreSQL + Redis（预留基础设施）
   ↑
 Worker (`apps/worker`)
   ↑
@@ -100,7 +100,7 @@ Polymarket Gamma / CLOB / WebSocket
 - 模块化单体；
 - Web/API/Worker 独立进程；
 - PostgreSQL 是业务真相；
-- Redis 用于缓存和未来任务；
+- Redis 容器和环境变量已预留，当前 M1 读路径尚未使用；后续只能承担可重建缓存和任务能力；
 - Provider Adapter；
 - Transactional Outbox；
 - 不可变双重记账；
@@ -298,12 +298,11 @@ Worker 定时触发
 → 自动测试
 → 类型检查
 → 构建
-→ 更新文档和 Changelog
+→ 更新文档、Changelog、CURRENT_STATE 和 Issue
 → Draft PR
 → CI 修正至全绿
-→ 更新 Issue
 → 合并
-→ 更新 CURRENT_STATE
+→ 核对 main、CI 和 Issue 最终状态
 ```
 
 禁止：
@@ -320,7 +319,7 @@ Worker 定时触发
 
 新聊天或 Work 模式中发送：
 
-> 连接 GitHub 仓库 `imtaka1988-lgtm/polymarket`。先读取根目录 `AGENTS.md`，再按顺序读取权威文档、最新打开 Issue、最近合并 PR 和 CI。不要立即写代码。先汇报当前阶段、已完成、未完成、风险和下一步，然后继续 Issue #2 的 M1.3。
+> 连接 GitHub 仓库 `imtaka1988-lgtm/polymarket`。先读取根目录 `AGENTS.md`，再按顺序读取权威文档、最新打开 Issue、最近合并 PR 和 CI。不要立即写代码。先汇报当前阶段、已完成、未完成、风险和下一步，然后继续 Issue #2 的 M1.6 管理后台与只读页面。
 
 读取后必须确认：
 
