@@ -16,7 +16,7 @@
 | 正式数据库迁移      | 核心工程能力    | 初始 Migration、Snapshot、Journal 已提交并由 CI 执行                              |
 | 数据库自动验收      | 核心工程能力    | PostgreSQL 16、迁移漂移、原子提交、幂等、回滚和锁测试已完成                       |
 | Event Keyset 同步   | 核心实现        | 已完成客户端、Cursor、重试、原始页、事务和多实例锁基线                            |
-| Market 标准化       | 核心实现        | 已完成 Event 内嵌 Market/Outcome 基线，需真实 Fixture 扩充                        |
+| Market 标准化       | 核心实现        | 已完成 Event 内嵌 Market/Outcome 基线，需脱敏真实网络 Event/Gamma 样本扩充        |
 | CLOB 实时行情       | 核心实现        | WebSocket、数据库 Token Source、动态订阅、Leader Lock、有界队列和价格持久化已完成 |
 | REST 行情对账       | 核心实现        | 批量订单簿、启动快照、周期校准、幂等快照和 current read model 已完成              |
 | 关闭/结算回查       | 核心实现        | 生命周期轮转回查、不可变证据和待人工复核 Candidate 已完成                         |
