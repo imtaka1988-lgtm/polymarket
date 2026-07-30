@@ -68,7 +68,6 @@ cd polymarket
 Copy-Item .env.example .env
 pnpm install
 docker compose up -d
-pnpm db:generate
 pnpm db:migrate
 pnpm doctor
 pnpm test
