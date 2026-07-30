@@ -1,6 +1,6 @@
 # Polymarket 数据接入与同步规范
 
-> 文档版本：V0.7
+> 文档版本：V0.8
 > 适用代码：`@forecast/provider-polymarket` 0.5.x、`@forecast/worker` 0.5.x
 > 最后更新：2026-07-30
 > 负责人：项目负责人 + AI/Codex  
@@ -448,8 +448,8 @@ Registry 保存进程当前“期望订阅集合”，负责：
 - 提供排序后的确定性快照；
 - 断线期间保留期望状态。
 
-后续 Worker Token Source 必须从 PostgreSQL 中已审核、可交易的本地 Market/Outcome 重建 Registry，
-不能把 WebSocket 当前连接状态当作业务真相。
+Worker Token Source 已从 PostgreSQL 中本地状态为 `open` 且带 Provider Token ID 的
+Market/Outcome 重建 Registry，并按配置定时刷新。WebSocket 当前连接状态不是业务真相。
 
 ### 19.3 连接生命周期
 
@@ -637,9 +637,9 @@ M1.3b 已完成 Token Source、REST 初始快照、周期校准、价格快照�
 
 仍需补充：
 
-- 脱敏真实官方 Fixture；
+- 脱敏真实网络 Event Keyset/Gamma 样本 Fixture；CLOB 与生命周期官方示例契约 Fixture 已存在；
 - 长期契约变化检测；
-- 大数据量性能测试；
+- staging 百万级目录、连接池容量和真实流量性能测试；当前 API 已有 2 万行确定性计划验收；
 - 真实网络长连接和恢复演练；
 - 外部告警渠道转发。
 
